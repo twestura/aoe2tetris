@@ -12,6 +12,9 @@ from AoE2ScenarioParser.datasets.conditions import Condition
 from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
+from AoE2ScenarioParser.objects.map_obj import MapObject
+from AoE2ScenarioParser.objects.unit_obj import UnitObject
+from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 import argparse
 import math
 import os.path
@@ -86,7 +89,10 @@ def _generate_game_board(mmgr, umgr):
     return pieces
 
 
-def _generate_hotkey_presses(mmgr, tmgr, umgr):
+def _generate_hotkey_presses(
+        mmgr: MapObject,
+        tmgr: TriggerObject,
+        umgr: UnitObject):
     """
     Generates the buildings and triggers for pressing hotkeys.
     """
