@@ -12,7 +12,7 @@ from AoE2ScenarioParser.datasets.buildings import Building
 from AoE2ScenarioParser.datasets.conditions import Condition
 from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
-from AoE2ScenarioParser.datasets.trigger_lists import Comparison, Operation
+from AoE2ScenarioParser.datasets.trigger_lists import Comparison, ObjectAttribute, Operation
 from AoE2ScenarioParser.datasets.units import Unit
 from AoE2ScenarioParser.objects.map_obj import MapObject
 from AoE2ScenarioParser.objects.unit_obj import UnitObject
@@ -42,6 +42,7 @@ Board = List[List[UnitObject]]
 # TODO add the Fisher Yates randomization triggers along with the loop and
 # the create object triggers.
 Test_FY_Triggers = Tuple[TriggerObject, List[List[TriggerObject]]]
+
 
 class ChanceNode:
     """
@@ -89,6 +90,7 @@ class ChanceNode:
         """Returns the failure trigger for failing the Chance condition."""
         return self._failure
 
+
 # A binary tree storing `TriggerObject`s or `int`s for generating random `int`s.
 ProbTree = BTreeNode[Union[ChanceNode, int]]
 
@@ -132,8 +134,64 @@ PLAYER_TETROMINO = {
 FY_TEST_SLOT_X = 10 # The first x coordinate for placing test pieces.
 FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 
-
 SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
+
+# The building reference ids used in selection hotkeys.
+HOTKEY_BUILDINGS = {
+    Building.BARRACKS,
+    Building.ARCHERY_RANGE
+}
+
+
+class HotkeyBuildings:
+    """A container for the buildings, triggers, and variables for hotkeys."""
+
+    def __init__(self, tmgr: TMgr, umgr: UMgr):
+        """
+        Places units on the map and declares triggers and variabels.
+
+        Units are initially placed as Invisible Objects,
+        then modified to have 0 Line of Sight,
+        then changed to their respective buildings.
+        """
+        self._ranges = []
+        self._barracks = []
+        self._init = tmgr.add_trigger('Initialize Buildings')
+        self._building_map = {
+            Building.BARRACKS: self._barracks,
+            Building.ARCHERY_RANGE: self._ranges,
+        }
+        for bid, building_lst in self._building_map.items():
+            for __ in range(2):
+                building_lst.append(umgr.add_unit(
+                    player=Player.TWO,
+                    unit_const=bid,
+                    x=BUILDING_X,
+                    y=BUILDING_Y
+                ))
+
+    @property
+    def ranges(self) -> List[UnitObject]:
+        return self._ranges
+
+    @property
+    def barracks(self) -> List[UnitObject]:
+        return self._barracks
+
+    @property
+    def init_buildings(self) -> TriggerObject:
+        """
+        Returns a trigger for initializing the buildings.
+
+        The trigger modifies their line of sight to be `0` and replaces the
+        Invisible Objects with their respective buildings.
+        """
+        return self._init
+
+    @property
+    def building_map(self):
+        """TODO specify and annotate type"""
+        return self._building_map
 
 
 def output_path() -> str:
@@ -364,6 +422,28 @@ def _add_test_init_var_trigger(tmgr: TMgr) -> TriggerObject:
     return tmgr.add_trigger('Initialize Tetromino Variables TEST')
 
 
+def _add_score_variable(tmgr: TMgr) -> VariableObject:
+    """Adds and returns a variable for the player's score."""
+    return tmgr.add_variable('score')
+
+
+def _init_score(tmgr: TMgr) -> TriggerObject:
+    """Returns a trigger declaration for initializing the player's score."""
+    return tmgr.add_trigger('Initialize Score')
+
+
+def _declare_score_obj(tmgr: TMgr, score_var: VariableObject) -> TriggerObject:
+    """Declares a trigger for the score objective."""
+    display_string = f'Score: <{score_var.name}>'
+    return tmgr.add_trigger(
+        'Score Objective',
+        display_as_objective=True,
+        display_on_screen=True,
+        description=display_string,
+        short_description=display_string
+    )
+
+
 def _declare_prob_tree(tmgr: TMgr, n: int) -> ProbTree:
     """
     Adds triggers for generating a random number between 0 and n inclusive.
@@ -438,13 +518,25 @@ class TetrisData:
     """
     def __init__(self, mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
         """Creates and initializes a TetrisData object."""
+        tmgr.add_trigger('-- Init --')
         _place_invisible_objects(umgr)
+        self._hotkeys = HotkeyBuildings(tmgr, umgr)
         self._board = _generate_game_board(mmgr, umgr)
         self._piece_vars = _declare_variables(tmgr)
+        self._score_var = _add_score_variable(tmgr)
         self._test_init_var_trigger = _add_test_init_var_trigger(tmgr)
+        self._init_score = _init_score(tmgr)
+        tmgr.add_trigger('-- Objectives --')
+        self._score_obj = _declare_score_obj(tmgr, self._score_var)
+        tmgr.add_trigger('-- Game Loop --')
         self._activate_random = _declare_activate_random(tmgr)
         self._rand_int_trees = _declare_rand_int_triggers(tmgr)
         self._test_piece_triggers = _declare_test_piece_triggers(tmgr)
+
+    @property
+    def hotkeys(self) -> HotkeyBuildings:
+        """Returns the manager for buildings and selection hotkeys."""
+        return self._hotkeys
 
     @property
     def board(self) -> Board:
@@ -455,6 +547,21 @@ class TetrisData:
     def piece_vars(self) -> List[List[VariableObject]]:
         """Returns a 2x7 list of "current" and "next" Tetromino variables."""
         return self._piece_vars
+
+    @property
+    def score_var(self) -> VariableObject:
+        """Returns a variable for keeping track of the player's Tetris score."""
+        return self._score_var
+
+    @property
+    def score_initializer(self) -> TriggerObject:
+        """Returns a trigger for setting the player's starting score."""
+        return self._init_score
+
+    @property
+    def score_objective(self) -> TriggerObject:
+        """Returns a trigger for displaying the player's score."""
+        return self._score_obj
 
     @property
     def activate_random(self) -> TriggerObject:
@@ -471,6 +578,57 @@ class TetrisData:
         """
         return self._rand_int_trees
 
+
+def _impl_hotkeys(tdata: TetrisData):
+    """Implements the building selection hotkeys and variables."""
+    for b in HOTKEY_BUILDINGS:
+        for p in PLAYERS[1:]:
+            tdata.hotkeys.init_buildings.add_effect(
+                Effect.MODIFY_ATTRIBUTE,
+                quantity=0,
+                object_list_unit_id=b,
+                source_player=p,
+                operation=Operation.SET,
+                object_attributes=ObjectAttribute.LINE_OF_SIGHT
+            )
+    p1_buildings = []
+    p0_buildings = []
+    for blst in tdata.hotkeys.building_map.values():
+        p1_buildings.append(blst[0])
+        p0_buildings.append(blst[1])
+    for (p, bds) in [(Player.ONE, p1_buildings), (Player.GAIA, p0_buildings)]:
+        tdata.hotkeys.init_buildings.add_effect(
+            Effect.CHANGE_OWNERSHIP,
+            source_player=Player.TWO,
+            target_player=p,
+            selected_object_ids=[b.reference_id for b in bds]
+        )
+
+
+def _impl_piece_vars(tdata: TetrisData, tmgr: TMgr):
+    """Implements the triggers for placing the tetromino variables."""
+    for pieces in tdata.piece_vars:
+        for k, var in enumerate(pieces):
+            tdata._test_init_var_trigger.add_effect(
+                Effect.CHANGE_VARIABLE,
+                quantity=k+2,
+                operation=Operation.SET,
+                from_variable=var.variable_id
+            )
+
+
+def _impl_objectives(tdata: TetrisData, tmgr: TMgr):
+    """Implements the triggers to initialize and display player score."""
+    tdata.score_initializer.add_effect(
+        Effect.CHANGE_VARIABLE,
+        quantity=0,
+        operation=Operation.SET,
+        from_variable=tdata.score_var.variable_id
+    )
+    tdata.score_objective.add_condition(
+        Condition.PLAYER_DEFEATED,
+        source_player=Player.GAIA
+    )
 
 def _impl_rand_tree(tdata: TetrisData, tmgr: TMgr, tree: ProbTree):
     """
@@ -583,26 +741,10 @@ def _test_impl_piece_display(tdata: TetrisData, tmgr: TMgr):
 
 def impl_triggers(tdata: TetrisData, mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
     """Implements triggers using the data initialized in `tdata`."""
-    for pieces in tdata.piece_vars:
-        for k, var in enumerate(pieces):
-            tdata._test_init_var_trigger.add_effect(
-                Effect.CHANGE_VARIABLE,
-                quantity=k+2,
-                operation=Operation.SET,
-                from_variable=var.variable_id
-            )
+    _impl_hotkeys(tdata)
+    _impl_piece_vars(tdata, tmgr)
+    _impl_objectives(tdata, tmgr)
     _test_impl_piece_display(tdata, tmgr)
-
-
-def fisher_yates(seq: List[Any]):
-    """Randomly permutes `seq` in place."""
-    # for i in range(len(seq) - 1):
-    #     j = random.randInt(i, j)
-    #     seq[i], seq[j] = seq[j], seq[i]
-    # inv: seq[j:] is randomized
-    for j in range(len(seq)-1, 0, -1):
-        i = random.randInt(0, j)
-        seq[i], seq[j] = seq[j], seq[i]
 
 
 def build(args):
@@ -628,7 +770,7 @@ def build(args):
     # 1. Define map and player info, place units, and declare triggers.
     # 2. Implement triggers.
     tdata = TetrisData(mmgr, tmgr, umgr)
-    _generate_hotkey_presses(mmgr, tmgr, umgr) # TODO refactor
+    # _generate_hotkey_presses(mmgr, tmgr, umgr) # TODO refactor
     impl_triggers(tdata, mmgr, tmgr, umgr)
 
     scn.write_to_file(output_path())
