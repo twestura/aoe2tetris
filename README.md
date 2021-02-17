@@ -49,15 +49,15 @@ The game engine checks for trigger execution once every game second.
 The game uses the "Select All" hotkeys to implement player hotkeys without moving the camera.
 The hotkeys and their actions are described in the following table and topic paragraphs.
 
-| Action                     | Hotkey                     |
-| -------------------------- | -------------------------- |
-| Move Left                  | Select All Archery Ranges  |
-| Move Right                 | Select All Barracks        |
-| Rotate Clockwise           | Select All Stables         |
-| Rotate Counterclockwise    | Select All Markets         |
-| Soft Drop                  | Select All Monasteries     |
-| Hard Drop (and Start Game) | Select All Castles         |
-| Hold                       | Select All Siege Workshops |
+| Action                     | Hotkey                     | Value |
+| -------------------------- | -------------------------- | ----- |
+| Move Left                  | Select All Archery Ranges  | 1     |
+| Move Right                 | Select All Barracks        | 2     |
+| Rotate Clockwise           | Select All Stables         | 3     |
+| Rotate Counterclockwise    | Select All Markets         | 4     |
+| Soft Drop                  | Select All Monasteries     | 5     |
+| Hard Drop (and Start Game) | Select All Castles         | 6     |
+| Hold                       | Select All Siege Workshops | 7     |
 
 The player has two of each building on the map.
 The buildings begin the scenario being owned by the player, but are switched to the Gaia player at the beginning of the scenario.
@@ -76,6 +76,13 @@ The ownership of the selected building then is swapped with the other building (
 
 A visual mod will remove the bottom-left of the UI and the selection sounds of the buildings.
 Otherwise they may be distracting for the player.
+
+### Storing the Hotkey Presses
+
+At the beginning of the game loop, the first triggers work to collect the player's hotkey press and store them in a variable.
+The value of that variable is then reset to 0 at the end of the game loop.
+The value for a corresponding key press is stored based on the table.
+Only one key is pressed per turn, with the highest building in the table (the one with the lowest value) being used if multiple hotkeys are pressed at once.
 
 ## State Machine
 

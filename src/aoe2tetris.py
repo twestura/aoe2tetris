@@ -154,6 +154,7 @@ class HotkeyBuildings:
         then modified to have 0 Line of Sight,
         then changed to their respective buildings.
         """
+        self._selected_var = tmgr.add_variable('Selected Building')
         self._ranges = []
         self._barracks = []
         self._init = tmgr.add_trigger('Initialize Buildings')
@@ -169,6 +170,12 @@ class HotkeyBuildings:
                     x=BUILDING_X,
                     y=BUILDING_Y
                 ))
+        self._selection_triggers = None
+
+    @property
+    def selected_var(self) -> VariableObject:
+        """Returns a variable for determining which object is selected."""
+        return self._selected_var
 
     @property
     def ranges(self) -> List[UnitObject]:
@@ -192,6 +199,33 @@ class HotkeyBuildings:
     def building_map(self):
         """TODO specify and annotate type"""
         return self._building_map
+
+    @property
+    def selection_triggers(self) -> List[List[TriggerObject]]:
+        """
+        Returns a 2d list of the triggers for determining user input.
+
+        Each element of the list is a 2d list of buildings where
+        the ownership is swapped whenever one is selected.
+        """
+        return self._selection_triggers
+
+    def init_selection_triggers(self, tmgr: TMgr):
+        """
+        Declares the triggers for selecting buildings.
+
+        Must be called near the start of the Game Loop to collect user input
+        before the input is used in subsequent triggers.
+        """
+        self._selection_triggers = [
+            [
+                tmgr.add_trigger('Archery Selected 0', enabled=False),
+                tmgr.add_trigger('Archery Selected 1', enabled=False)],
+            [
+                tmgr.add_trigger('Barracks Selected 0', enabled=False),
+                tmgr.add_trigger('Barracks Selected 1', enabled=False)
+            ],
+        ]
 
 
 def output_path() -> str:
@@ -518,6 +552,18 @@ class TetrisData:
     """
     def __init__(self, mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
         """Creates and initializes a TetrisData object."""
+
+        center_x = mmgr.map_width / 2.0 + 0.5
+        center_y = mmgr.map_height / 2.0 + 0.5
+        rotation = 0.75 * math.pi
+        self._test_cata = umgr.add_unit(
+            player=Player.ONE,
+            unit_const=Unit.ELITE_CATAPHRACT,
+            x=center_x,
+            y=center_y,
+            rotation=rotation
+        )
+
         tmgr.add_trigger('-- Init --')
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(tmgr, umgr)
@@ -526,12 +572,17 @@ class TetrisData:
         self._score_var = _add_score_variable(tmgr)
         self._test_init_var_trigger = _add_test_init_var_trigger(tmgr)
         self._init_score = _init_score(tmgr)
+
         tmgr.add_trigger('-- Objectives --')
         self._score_obj = _declare_score_obj(tmgr, self._score_var)
+
         tmgr.add_trigger('-- Game Loop --')
-        self._activate_random = _declare_activate_random(tmgr)
-        self._rand_int_trees = _declare_rand_int_triggers(tmgr)
-        self._test_piece_triggers = _declare_test_piece_triggers(tmgr)
+        self._game_loop = tmgr.add_trigger('Game Loop', looping=True)
+        self._hotkeys.init_selection_triggers(tmgr)
+        # self._activate_random = _declare_activate_random(tmgr)
+        # self._rand_int_trees = _declare_rand_int_triggers(tmgr)
+        # self._test_piece_triggers = _declare_test_piece_triggers(tmgr)
+        self._cleanup = tmgr.add_trigger('Cleanup', enabled=False)
 
     @property
     def hotkeys(self) -> HotkeyBuildings:
@@ -564,19 +615,109 @@ class TetrisData:
         return self._score_obj
 
     @property
-    def activate_random(self) -> TriggerObject:
-        """Returns a trigger for performing the Fisher Yates permutation."""
-        return self._activate_random
+    def game_loop(self) -> TriggerObject:
+        """Returns a trigger for starting the main game loop."""
+        return self._game_loop
+
+    # @property
+    # def activate_random(self) -> TriggerObject:
+    #     """Returns a trigger for performing the Fisher Yates permutation."""
+    #     return self._activate_random
+
+    # @property
+    # def rand_int_trees(self) -> List[PropTree]:
+    #     """
+    #     Returns a list of random integer trigger trees.
+
+    #     The returned list is `[t6, t5, t4, t3, t2, t1]`, where `tn` is a tree
+    #     for generating numbers from `0` to `n`, inclusive.
+    #     """
+    #     return self._rand_int_trees
 
     @property
-    def rand_int_trees(self) -> List[PropTree]:
-        """
-        Returns a list of random integer trigger trees.
+    def cleanup(self) -> TriggerObject:
+        """Returns a trigger for cleanup at the end of every game loop."""
+        return self._cleanup
 
-        The returned list is `[t6, t5, t4, t3, t2, t1]`, where `tn` is a tree
-        for generating numbers from `0` to `n`, inclusive.
-        """
-        return self._rand_int_trees
+
+def _impl_game_loop(tdata: TetrisData):
+    """Implements the main game loop trigger."""
+    for t in [tdata.game_loop, tdata.cleanup]:
+        t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=0,
+            operation=Operation.SET,
+            from_variable=tdata.hotkeys.selected_var.variable_id
+        )
+
+    selection_triggers = []
+    for tlst in tdata.hotkeys.selection_triggers:
+        for t in tlst:
+            selection_triggers.append(t)
+    for t in selection_triggers:
+        tdata.game_loop.add_effect(
+            Effect.ACTIVATE_TRIGGER,
+            trigger_id=t.trigger_id
+        )
+
+    # Archery Selected
+    archery_triggers = tdata.hotkeys.selection_triggers[0]
+    ranges = tdata.hotkeys.ranges
+    for t, a in zip(archery_triggers, ranges):
+        t.add_condition(
+            Condition.OBJECT_SELECTED,
+            unit_object=a.reference_id
+        )
+        t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=1,
+            operation=Operation.SET,
+            from_variable=tdata.hotkeys.selected_var.variable_id
+        )
+
+    # Barracks Selected
+    barracks_triggers = tdata.hotkeys.selection_triggers[1]
+    barracks = tdata.hotkeys.barracks
+    for t, b in zip(barracks_triggers, barracks):
+        t.add_condition(
+            Condition.OBJECT_SELECTED,
+            unit_object=b.reference_id
+        )
+        t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=2,
+            operation=Operation.SET,
+            from_variable=tdata.hotkeys.selected_var.variable_id
+        )
+
+    for (buildings, triggers) in [
+            (ranges, archery_triggers),
+            (barracks, barracks_triggers)]:
+        for k in [0, 1]:
+            triggers[k].add_effect(
+                Effect.CHANGE_OWNERSHIP,
+                source_player=Player.ONE,
+                target_player=Player.GAIA,
+                selected_object_ids=buildings[k].reference_id
+            )
+            triggers[k].add_effect(
+                Effect.CHANGE_OWNERSHIP,
+                source_player=Player.GAIA,
+                target_player=Player.ONE,
+                selected_object_ids=buildings[(k+1) % 2].reference_id
+            )
+
+    for i in range(len(selection_triggers)):
+        for j in range(i+1, len(selection_triggers)):
+            selection_triggers[i].add_effect(
+                Effect.DEACTIVATE_TRIGGER,
+                trigger_id=selection_triggers[j].trigger_id
+            )
+
+    tdata._game_loop.add_effect(
+        Effect.ACTIVATE_TRIGGER,
+        trigger_id=tdata.cleanup.trigger_id
+    )
 
 
 def _impl_hotkeys(tdata: TetrisData):
@@ -741,10 +882,11 @@ def _test_impl_piece_display(tdata: TetrisData, tmgr: TMgr):
 
 def impl_triggers(tdata: TetrisData, mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
     """Implements triggers using the data initialized in `tdata`."""
+    _impl_game_loop(tdata)
     _impl_hotkeys(tdata)
     _impl_piece_vars(tdata, tmgr)
     _impl_objectives(tdata, tmgr)
-    _test_impl_piece_display(tdata, tmgr)
+    # _test_impl_piece_display(tdata, tmgr)
 
 
 def build(args):
