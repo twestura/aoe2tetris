@@ -43,9 +43,54 @@ Board = List[List[UnitObject]]
 # the create object triggers.
 Test_FY_Triggers = Tuple[TriggerObject, List[List[TriggerObject]]]
 
+class ChanceNode:
+    """
+    A node in a probability tree representing a Chance and two paths.
+
+    The `percent` is the integer chance from `0` to `100` of succeeding the
+    Chance condition and choosing the left branch, with the right branch being
+    chosen on failure.
+    """
+
+    def __init__(
+            self,
+            percent: int,
+            success: TriggerObject,
+            failure: TriggerObject):
+        """
+        Constructs a new ChanceNode.
+
+        Parameters:
+            percent: The chance of succeeding the Chance condition.
+            success: The trigger to activate when the Chance succeeds.
+            failure: The trigger to activate when the Chance fails.
+
+        Raises:
+            ValueError: If `percent` is not within `0` to `100`, inclusive.
+        """
+        if percent < 0 or 100 < percent:
+            raise ValueError(f'{percent} must be in `0--100`, inclusive.')
+        self._percent = percent
+        self._success = success
+        self._failure = failure
+
+    @property
+    def percent(self) -> int:
+        """Returns the percent for the Chance condition."""
+        return self._percent
+
+    @property
+    def success(self) -> TriggerObject:
+        """Returns the success trigger for passing the Chance condition."""
+        return self._success
+
+    @property
+    def failure(self) -> TriggerObject:
+        """Returns the failure trigger for failing the Chance condition."""
+        return self._failure
+
 # A binary tree storing `TriggerObject`s or `int`s for generating random `int`s.
-# TODO better specification
-ProbTree = BTreeNode[Union[Tuple[int, TriggerObject, TriggerObject], int]]
+ProbTree = BTreeNode[Union[ChanceNode, int]]
 
 SCN_EXT = 'aoe2scenario' # Scenario file extension.
 OUT_SCN_DIR = 'out-scns' # Output directory for built files.
@@ -325,12 +370,13 @@ def _declare_prob_tree(tmgr: TMgr, n: int) -> ProbTree:
 
     Raises a `ValueError` if `n` is nonpositive.
     """
+    # TODO there are still some unnecessary triggers for swapping index 0.
     if n < 1:
         raise ValueError(f'{n} must be positive.')
     name_prefix = f'Generate 0--{n}'
     name_char = 'a'
 
-    def helper(left: int, right: int) -> ProbTree:
+    def declare_range(left: int, right: int) -> ProbTree:
         """Returns a `ProbTree` for generating numbers in `left:right`."""
         nonlocal name_char
         total = right - left
@@ -350,11 +396,11 @@ def _declare_prob_tree(tmgr: TMgr, n: int) -> ProbTree:
         )
         name_char = chr(ord(name_char) + 1)
         return BTreeNode(
-            (percent, success, failure),
-            BTreeNode(left) if num_left == 1 else helper(left, mid),
-            BTreeNode(right - 1) if num_right == 1 else helper(mid, right)
+            ChanceNode(percent, success, failure),
+            BTreeNode(left) if num_left == 1 else declare_range(left, mid),
+            BTreeNode(right - 1) if num_right == 1 else declare_range(mid, right)
         )
-    return helper(0, n + 1)
+    return declare_range(0, n + 1)
 
 
 def _declare_activate_random(tmgr: TMgr) -> TriggerObject:
@@ -427,63 +473,56 @@ class TetrisData:
 
 
 def _impl_rand_tree(tdata: TetrisData, tmgr: TMgr, tree: ProbTree):
-    """Implements the triggers for `tree`."""
+    """
+    Implements the triggers for `tree`.
+
+    Requires that `tree` stores `ChanceNode` data (not `int` data).
+    Requires that the root `tree` node's `success` and `failure` triggers
+        are activated by a trigger that occurs in `tmgr`'s trigger list
+        before any of the `success` or `failure` triggers in the tree.
+    """
     current_pieces = tdata.piece_vars[0]
     var_id0 = current_pieces[0].variable_id
-    nodes = [tree]
-    # TODO need activate trigger effects
+    nodes = [tree] # The internal tree nodes with triggers to implement.
     while nodes:
         n = nodes.pop()
         assert not isinstance(n.data, int)
-        percent, success, failure = n.data
+        percent = n.data.percent
+        success = n.data.success
+        failure = n.data.failure
         success.add_condition(Condition.CHANCE, amount_or_quantity=percent)
-        success.add_effect(
-            Effect.DEACTIVATE_TRIGGER,
-            trigger_id=success.trigger_id
-        )
-        assert n.left
-        if isinstance(n.left.data, int):
-            if n.left.data != 0:
-                left_var_id = current_pieces[n.left.data].variable_id
-                success.add_effect(
-                    Effect.SCRIPT_CALL,
-                    message=_swap_msg(var_id0, left_var_id)
-                )
-        else:
-            nodes.append(n.left)
-            for t in [n.left.data[1], n.left.data[2]]:
-                success.add_effect(
-                    Effect.ACTIVATE_TRIGGER,
-                    trigger_id=t.trigger_id
-                )
-        failure.add_effect(
-            Effect.DEACTIVATE_TRIGGER,
-            trigger_id=success.trigger_id
-        )
-        assert n.right
-        if isinstance(n.right.data, int):
-            if n.right.data != 0:
-                right_var_id = current_pieces[n.right.data].variable_id
-                failure.add_effect(
-                    Effect.SCRIPT_CALL,
-                    message=_swap_msg(var_id0, right_var_id)
-                )
-        else:
-            nodes.append(n.right)
-            for t in [n.right.data[1], n.right.data[2]]:
-                failure.add_effect(
-                    Effect.ACTIVATE_TRIGGER,
-                    trigger_id=t.trigger_id
-                )
+        for child, trigger in [(n.left, success), (n.right, failure)]:
+            assert child
+            trigger.add_effect(
+                Effect.DEACTIVATE_TRIGGER,
+                trigger_id=success.trigger_id
+            )
+            if isinstance(child.data, int):
+                # Swaps the contents of the variable at index 0 with that
+                # of the variable at any nonzero index.
+                k = child.data
+                if k != 0:
+                    var_id = current_pieces[k].variable_id
+                    trigger.add_effect(
+                        Effect.SCRIPT_CALL,
+                        message=_swap_msg(var_id0, var_id)
+                    )
+            else:
+                nodes.append(child)
+                for t in [child.data.success, child.data.failure]:
+                    trigger.add_effect(
+                        Effect.ACTIVATE_TRIGGER,
+                        trigger_id = t.trigger_id
+                    )
 
 
 def _impl_rand_trees(tdata: TetrisData, tmgr: TMgr):
     """Implements the random tree triggers used in Fisher Yates."""
     for tree in tdata.rand_int_trees:
-        for d in (1, 2):
+        for t in (tree.data.success, tree.data.failure):
             tdata.activate_random.add_effect(
                 Effect.ACTIVATE_TRIGGER,
-                trigger_id=tree.data[d].trigger_id
+                trigger_id=t.trigger_id
             )
         _impl_rand_tree(tdata, tmgr, tree)
 
