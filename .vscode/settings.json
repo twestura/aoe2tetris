@@ -5,9 +5,14 @@
         "Longbowman",
         "Tetris",
         "Tetromino",
+        "btreenode",
         "cata",
         "mmgr",
+        "pseudocode",
+        "pvars",
         "scns",
+        "tdata",
+        "tlst",
         "tmgr",
         "umgr"
     ]

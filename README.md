@@ -107,6 +107,64 @@ Moving pieces consists of using Replace Object and Change Ownership effects.
 
 ## Piece Generation
 
+We use the Fisher Yates algorithm to permute a list of 7 pieces randomly.
+A simple implementation of this algorithm in Python is as follows.
+
+```python
+def fisher_yates(seq: List[Any]):
+    """Randomly permutes `seq` in place."""
+    # inv: seq[j:] is randomized.
+    for j in range(len(seq)-1, 0, -1):
+        i = random.randInt(0, j)
+        seq[i], seq[j] = seq[j], seq[i]
+```
+
+Random integers are needed in order to implement the inner part of the algorithm's loop.
+In order to generate random integers we use a sequence of triggers with the `Chance` condition.
+
+The scenario editor consists of a list of triggers that are checked once every game second, essentially following this pseudocode:
+
+```text
+for t in trigger_list:
+    if t.is_active and all(c.is_satisfied for c in t.conditions):
+        for e in t.effects:
+            e.execute()
+```
+
+Importantly, if we activate/deactivate a trigger, the effect takes place during the current game tick's iteration of this loop.
+For example the following code displays `C` (on the current tick), then `D` (on the current tick), then `A` (on the subsequent tick).
+
+```text
+Trigger A -> disabled, displays "A"
+Trigger B -> enabled, activates A, activates D
+Trigger C -> enabled, displays "C"
+Trigger D -> disabled, displays "D"
+```
+
+To generate random numbers, we use triggers with `Chance` conditions set up in a tree to generate probabilities.
+The `Chance` conditions are the inner nodes of the tree, and the leaves are integers.
+For each node, the `Chance` probability `p` is a number between `0` and `100`.
+This number `p` is the probability of choosing the left path in the tree, and `100 - p` is the probability of choosing the right path in the tree.
+The product of the probabilities from the root to a leaf is the probability of choosing that integer.
+
+For example, to generate a random number from 0, 1, or 2, we used the following tree.
+
+```text
+    67
+   /  \
+  50   2
+ /  \
+0    1
+```
+
+The probability of generating each number is:
+
+0. `0.67 * 0.5 = 0.33`
+1. `0.67 * (1 - 0.5) = 0.33`
+2. `1 - 0.67 = 0.33`
+
+We generate the random numbers and perform the Fisher Yates algorithm in one game tick, iterating through the trigger list.
+
 ## Next Pieces
 
 ## Hold Piece
