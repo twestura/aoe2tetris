@@ -8,7 +8,7 @@ https://github.com/ksneijders/aoe2scenarioparser
 
 from __future__ import annotations
 from AoE2ScenarioParser.aoe2_scenario import AoE2Scenario
-from AoE2ScenarioParser.datasets.buildings import Building
+from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.conditions import Condition
 from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
@@ -138,7 +138,7 @@ FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
 
 
-class Actions(Enum):
+class Action(Enum):
     """
     The actions a player may take during a game by pressing hotkeys.
 
@@ -153,10 +153,17 @@ class Actions(Enum):
     HOLD = 7
 
 
-# The building reference ids used in selection hotkeys.
+# Maps the building id of a select all building hotkey to the actions that
+# selecting the building performs.
 HOTKEY_BUILDINGS = {
-    Building.BARRACKS,
-    Building.ARCHERY_RANGE
+    Building.ARCHERY_RANGE : Action.MOVE_LEFT,
+    # TODO switch Barracks for Blacksmith
+    Building.BARRACKS : Action.MOVE_RIGHT,
+    Building.STABLE : Action.ROTATE_CLOCKWISE,
+    Building.MARKET : Action.ROTATE_COUNTERCLOCKWISE,
+    Building.MONASTERY : Action.SOFT_DROP,
+    Building.CASTLE : Action.HARD_DROP,
+    Building.SIEGE_WORKSHOP : Action.HOLD
 }
 
 
@@ -172,35 +179,22 @@ class HotkeyBuildings:
         then changed to their respective buildings.
         """
         self._selected_var = tmgr.add_variable('Selected Building')
-        self._ranges = []
-        self._barracks = []
         self._init = tmgr.add_trigger('Initialize Buildings')
         self._building_map = {
-            Building.BARRACKS: self._barracks,
-            Building.ARCHERY_RANGE: self._ranges,
+            bid : umgr.add_unit(
+                player=Player.GAIA,
+                unit_const=bid,
+                x = BUILDING_X,
+                y = BUILDING_Y
+            )
+            for bid in HOTKEY_BUILDINGS.keys()
         }
-        for bid, building_lst in self._building_map.items():
-            for __ in range(2):
-                building_lst.append(umgr.add_unit(
-                    player=Player.TWO,
-                    unit_const=bid,
-                    x=BUILDING_X,
-                    y=BUILDING_Y
-                ))
         self._selection_triggers = None
 
     @property
     def selected_var(self) -> VariableObject:
         """Returns a variable for determining which object is selected."""
         return self._selected_var
-
-    @property
-    def ranges(self) -> List[UnitObject]:
-        return self._ranges
-
-    @property
-    def barracks(self) -> List[UnitObject]:
-        return self._barracks
 
     @property
     def init_buildings(self) -> TriggerObject:
@@ -227,22 +221,18 @@ class HotkeyBuildings:
         """
         return self._selection_triggers
 
-    def init_selection_triggers(self, tmgr: TMgr):
+    def declare_selection_triggers(self, tmgr: TMgr):
         """
         Declares the triggers for selecting buildings.
+        TODO add return type for dictionary
 
         Must be called near the start of the Game Loop to collect user input
         before the input is used in subsequent triggers.
         """
-        self._selection_triggers = [
-            [
-                tmgr.add_trigger('Archery Selected 0', enabled=False),
-                tmgr.add_trigger('Archery Selected 1', enabled=False)],
-            [
-                tmgr.add_trigger('Barracks Selected 0', enabled=False),
-                tmgr.add_trigger('Barracks Selected 1', enabled=False)
-            ],
-        ]
+        self._selection_triggers = {
+            b : tmgr.add_trigger(f'Select {building_names[b]}', enabled=False)
+            for b in HOTKEY_BUILDINGS.keys()
+        }
 
 
 def output_path() -> str:
@@ -322,149 +312,6 @@ def _declare_variables(tmgr: TMgr) -> List[List[VariableObject]]:
     next_pieces = [tmgr.add_variable(f'Tetromino {k}')
                    for k in range(NUM_TETROMINO, 2*NUM_TETROMINO)]
     return [current_pieces, next_pieces]
-
-
-def _generate_hotkey_presses(mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
-    """Generates the buildings and triggers for pressing hotkeys."""
-    center_x = mmgr.map_width / 2.0 + 0.5
-    center_y = mmgr.map_height / 2.0 + 0.5
-    rotation = 0.75 * math.pi
-    cata = umgr.add_unit(
-        player=Player.ONE,
-        unit_const=Unit.ELITE_CATAPHRACT,
-        x=center_x,
-        y=center_y,
-        rotation=rotation
-    )
-
-    archery0 = umgr.add_unit(
-        player=Player.ONE,
-        unit_const=Building.ARCHERY_RANGE,
-        x=BUILDING_X,
-        y=BUILDING_Y
-    )
-    archery1 = umgr.add_unit(
-        player=Player.ONE,
-        unit_const=Building.ARCHERY_RANGE,
-        x=BUILDING_X,
-        y=BUILDING_Y
-    )
-
-    barracks0 = umgr.add_unit(
-        player=Player.ONE,
-        unit_const=Building.BARRACKS,
-        x=BUILDING_X,
-        y=BUILDING_Y
-    )
-    barracks1 = umgr.add_unit(
-        player=Player.ONE,
-        unit_const=Building.BARRACKS,
-        x=BUILDING_X,
-        y=BUILDING_Y
-    )
-
-    buildings_gaia = tmgr.add_trigger('Set Starting Buildings to Gaia')
-    building_ids = [barracks1.reference_id, archery1.reference_id]
-    buildings_gaia.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=building_ids,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-    )
-
-    select_barracks_0 = tmgr.add_trigger('Move Right 0', looping=True)
-    select_barracks_1 = tmgr.add_trigger('Move Right 1', looping=True)
-    select_barracks_0.add_condition(
-        Condition.OBJECT_SELECTED,
-        unit_object=barracks0.reference_id
-    )
-    select_barracks_0.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=barracks0.reference_id,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-    )
-    select_barracks_0.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=barracks1.reference_id,
-        source_player=Player.GAIA,
-        target_player=Player.ONE,
-    )
-    select_barracks_0.add_effect(
-        Effect.TELEPORT_OBJECT,
-        selected_object_ids=cata.reference_id,
-        location_x=73,
-        location_y=73,
-    )
-    select_barracks_1.add_condition(
-        Condition.OBJECT_SELECTED,
-        unit_object=barracks1.reference_id
-    )
-    select_barracks_1.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=barracks1.reference_id,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-    )
-    select_barracks_1.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=barracks0.reference_id,
-        source_player=Player.GAIA,
-        target_player=Player.ONE,
-    )
-    select_barracks_1.add_effect(
-        Effect.TELEPORT_OBJECT,
-        selected_object_ids=cata.reference_id,
-        location_x=73,
-        location_y=73,
-    )
-
-    select_archery_0 = tmgr.add_trigger('Move Left 0', looping=True)
-    select_archery_1 = tmgr.add_trigger('Move Left 1', looping=True)
-    select_archery_0.add_condition(
-        Condition.OBJECT_SELECTED,
-        unit_object=archery0.reference_id
-    )
-    select_archery_0.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=archery0.reference_id,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-    )
-    select_archery_0.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=archery1.reference_id,
-        source_player=Player.GAIA,
-        target_player=Player.ONE,
-    )
-    select_archery_0.add_effect(
-        Effect.TELEPORT_OBJECT,
-        selected_object_ids=cata.reference_id,
-        location_x=71,
-        location_y=71,
-    )
-    select_archery_1.add_condition(
-        Condition.OBJECT_SELECTED,
-        unit_object=archery1.reference_id
-    )
-    select_archery_1.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=archery1.reference_id,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-    )
-    select_archery_1.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        selected_object_ids=archery0.reference_id,
-        source_player=Player.GAIA,
-        target_player=Player.ONE,
-    )
-    select_archery_1.add_effect(
-        Effect.TELEPORT_OBJECT,
-        selected_object_ids=cata.reference_id,
-        location_x=71,
-        location_y=71,
-    )
 
 
 def _add_test_init_var_trigger(tmgr: TMgr) -> TriggerObject:
@@ -570,6 +417,7 @@ class TetrisData:
     def __init__(self, mmgr: MMgr, tmgr: TMgr, umgr: UMgr):
         """Creates and initializes a TetrisData object."""
 
+        # TODO remove test cataphract
         center_x = mmgr.map_width / 2.0 + 0.5
         center_y = mmgr.map_height / 2.0 + 0.5
         rotation = 0.75 * math.pi
@@ -595,7 +443,7 @@ class TetrisData:
 
         tmgr.add_trigger('-- Game Loop --')
         self._game_loop = tmgr.add_trigger('Game Loop', looping=True)
-        self._hotkeys.init_selection_triggers(tmgr)
+        self._hotkeys.declare_selection_triggers(tmgr)
         self._move_left = tmgr.add_trigger('Move Left', enabled=False)
         self._move_right = tmgr.add_trigger('Move Right', enabled=False)
         # self._activate_random = _declare_activate_random(tmgr)
@@ -664,7 +512,7 @@ def _impl_move_left_right(tdata: TetrisData):
     cata = tdata._test_cata
     tdata._move_left.add_condition(
         Condition.VARIABLE_VALUE,
-        amount_or_quantity=1, # TODO remove magic numbers
+        amount_or_quantity=Action.MOVE_LEFT.value,
         variable=tdata.hotkeys.selected_var.variable_id,
         comparison=Comparison.EQUAL
     )
@@ -676,7 +524,7 @@ def _impl_move_left_right(tdata: TetrisData):
     )
     tdata._move_right.add_condition(
         Condition.VARIABLE_VALUE,
-        amount_or_quantity=2, # TODO remove magic numbers
+        amount_or_quantity=Action.MOVE_RIGHT.value,
         variable=tdata.hotkeys.selected_var.variable_id,
         comparison=Comparison.EQUAL
     )
@@ -690,18 +538,14 @@ def _impl_move_left_right(tdata: TetrisData):
 
 def _impl_game_loop(tdata: TetrisData):
     """Implements the main game loop trigger."""
-    for t in [tdata.game_loop, tdata.cleanup]:
-        t.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=0,
-            operation=Operation.SET,
-            from_variable=tdata.hotkeys.selected_var.variable_id
-        )
+    tdata.game_loop.add_effect(
+        Effect.CHANGE_VARIABLE,
+        quantity=0,
+        operation=Operation.SET,
+        from_variable=tdata.hotkeys.selected_var.variable_id
+    )
 
-    selection_triggers = []
-    for tlst in tdata.hotkeys.selection_triggers:
-        for t in tlst:
-            selection_triggers.append(t)
+    selection_triggers = list(tdata.hotkeys.selection_triggers.values())
     for t in selection_triggers:
         tdata.game_loop.add_effect(
             Effect.ACTIVATE_TRIGGER,
@@ -712,59 +556,33 @@ def _impl_game_loop(tdata: TetrisData):
             Effect.ACTIVATE_TRIGGER,
             trigger_id=t.trigger_id
         )
+        # TODO create local "selection trigger" cleanup trigger
         tdata.cleanup.add_effect(
             Effect.DEACTIVATE_TRIGGER,
             trigger_id=t.trigger_id
         )
 
-    # Archery Selected
-    archery_triggers = tdata.hotkeys.selection_triggers[0]
-    ranges = tdata.hotkeys.ranges
-    for t, a in zip(archery_triggers, ranges):
+    # Building Selected
+    for b, t in tdata.hotkeys.selection_triggers.items():
+        bid = tdata.hotkeys.building_map[b].reference_id
         t.add_condition(
             Condition.OBJECT_SELECTED,
-            unit_object=a.reference_id
+            unit_object=bid
         )
         t.add_effect(
             Effect.CHANGE_VARIABLE,
-            quantity=1,
+            quantity=HOTKEY_BUILDINGS[b].value,
             operation=Operation.SET,
             from_variable=tdata.hotkeys.selected_var.variable_id
         )
-
-    # Barracks Selected
-    barracks_triggers = tdata.hotkeys.selection_triggers[1]
-    barracks = tdata.hotkeys.barracks
-    for t, b in zip(barracks_triggers, barracks):
-        t.add_condition(
-            Condition.OBJECT_SELECTED,
-            unit_object=b.reference_id
-        )
-        t.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=2,
-            operation=Operation.SET,
-            from_variable=tdata.hotkeys.selected_var.variable_id
-        )
-
-    for (buildings, triggers) in [
-            (ranges, archery_triggers),
-            (barracks, barracks_triggers)]:
-        for k in [0, 1]:
-            triggers[k].add_effect(
+        for src, tar in [(Player.ONE, Player.GAIA), (Player.GAIA, Player.ONE)]:
+            t.add_effect(
                 Effect.CHANGE_OWNERSHIP,
-                source_player=Player.ONE,
-                target_player=Player.GAIA,
-                selected_object_ids=buildings[k].reference_id
+                source_player=src,
+                target_player=tar,
+                selected_object_ids=bid
             )
-            triggers[k].add_effect(
-                Effect.CHANGE_OWNERSHIP,
-                source_player=Player.GAIA,
-                target_player=Player.ONE,
-                selected_object_ids=buildings[(k+1) % 2].reference_id
-            )
-
-    for i in range(len(selection_triggers)):
+    for i in range(len(selection_triggers) - 1):
         for j in range(i+1, len(selection_triggers)):
             selection_triggers[i].add_effect(
                 Effect.DEACTIVATE_TRIGGER,
@@ -781,8 +599,8 @@ def _impl_game_loop(tdata: TetrisData):
 
 def _impl_hotkeys(tdata: TetrisData):
     """Implements the building selection hotkeys and variables."""
-    for b in HOTKEY_BUILDINGS:
-        for p in PLAYERS[1:]:
+    for b in HOTKEY_BUILDINGS.keys():
+        for p in (Player.GAIA, Player.ONE):
             tdata.hotkeys.init_buildings.add_effect(
                 Effect.MODIFY_ATTRIBUTE,
                 quantity=0,
@@ -791,18 +609,14 @@ def _impl_hotkeys(tdata: TetrisData):
                 operation=Operation.SET,
                 object_attributes=ObjectAttribute.LINE_OF_SIGHT
             )
-    p1_buildings = []
-    p0_buildings = []
-    for blst in tdata.hotkeys.building_map.values():
-        p1_buildings.append(blst[0])
-        p0_buildings.append(blst[1])
-    for (p, bds) in [(Player.ONE, p1_buildings), (Player.GAIA, p0_buildings)]:
-        tdata.hotkeys.init_buildings.add_effect(
-            Effect.CHANGE_OWNERSHIP,
-            source_player=Player.TWO,
-            target_player=p,
-            selected_object_ids=[b.reference_id for b in bds]
-        )
+    tdata.hotkeys.init_buildings.add_effect(
+        Effect.CHANGE_OWNERSHIP,
+        source_player=Player.GAIA,
+        target_player=Player.ONE,
+        selected_object_ids=[
+            b.reference_id for b in tdata.hotkeys.building_map.values()
+        ]
+    )
 
 
 def _impl_piece_vars(tdata: TetrisData, tmgr: TMgr):
@@ -971,7 +785,6 @@ def build(args):
     # 1. Define map and player info, place units, and declare triggers.
     # 2. Implement triggers.
     tdata = TetrisData(mmgr, tmgr, umgr)
-    # _generate_hotkey_presses(mmgr, tmgr, umgr) # TODO refactor
     impl_triggers(tdata, mmgr, tmgr, umgr)
 
     scn.write_to_file(output_path())
