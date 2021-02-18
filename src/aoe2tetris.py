@@ -20,6 +20,7 @@ from AoE2ScenarioParser.objects.units_obj import UnitsObject
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject
 from AoE2ScenarioParser.objects.variable_obj import VariableObject
+from enum import Enum
 from btreenode import BTreeNode
 from typing import Any, List, Tuple, Union
 import argparse
@@ -135,6 +136,22 @@ FY_TEST_SLOT_X = 10 # The first x coordinate for placing test pieces.
 FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 
 SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
+
+
+class Actions(Enum):
+    """
+    The actions a player may take during a game by pressing hotkeys.
+
+    The int value of each enum is the priority of the enum.
+    """
+    MOVE_LEFT = 1
+    MOVE_RIGHT = 2
+    ROTATE_CLOCKWISE = 3
+    ROTATE_COUNTERCLOCKWISE = 4
+    SOFT_DROP = 5
+    HARD_DROP = 6
+    HOLD = 7
+
 
 # The building reference ids used in selection hotkeys.
 HOTKEY_BUILDINGS = {
@@ -579,6 +596,8 @@ class TetrisData:
         tmgr.add_trigger('-- Game Loop --')
         self._game_loop = tmgr.add_trigger('Game Loop', looping=True)
         self._hotkeys.init_selection_triggers(tmgr)
+        self._move_left = tmgr.add_trigger('Move Left', enabled=False)
+        self._move_right = tmgr.add_trigger('Move Right', enabled=False)
         # self._activate_random = _declare_activate_random(tmgr)
         # self._rand_int_trees = _declare_rand_int_triggers(tmgr)
         # self._test_piece_triggers = _declare_test_piece_triggers(tmgr)
@@ -640,6 +659,35 @@ class TetrisData:
         return self._cleanup
 
 
+def _impl_move_left_right(tdata: TetrisData):
+    """Implements moving the test Cataphract left and right."""
+    cata = tdata._test_cata
+    tdata._move_left.add_condition(
+        Condition.VARIABLE_VALUE,
+        amount_or_quantity=1, # TODO remove magic numbers
+        variable=tdata.hotkeys.selected_var.variable_id,
+        comparison=Comparison.EQUAL
+    )
+    tdata._move_left.add_effect(
+        Effect.TELEPORT_OBJECT,
+        selected_object_ids=cata.reference_id,
+        location_x=71,
+        location_y=71,
+    )
+    tdata._move_right.add_condition(
+        Condition.VARIABLE_VALUE,
+        amount_or_quantity=2, # TODO remove magic numbers
+        variable=tdata.hotkeys.selected_var.variable_id,
+        comparison=Comparison.EQUAL
+    )
+    tdata._move_right.add_effect(
+        Effect.TELEPORT_OBJECT,
+        selected_object_ids=cata.reference_id,
+        location_x=73,
+        location_y=73,
+    )
+
+
 def _impl_game_loop(tdata: TetrisData):
     """Implements the main game loop trigger."""
     for t in [tdata.game_loop, tdata.cleanup]:
@@ -657,6 +705,15 @@ def _impl_game_loop(tdata: TetrisData):
     for t in selection_triggers:
         tdata.game_loop.add_effect(
             Effect.ACTIVATE_TRIGGER,
+            trigger_id=t.trigger_id
+        )
+    for t in [tdata._move_left, tdata._move_right]:
+        tdata.game_loop.add_effect(
+            Effect.ACTIVATE_TRIGGER,
+            trigger_id=t.trigger_id
+        )
+        tdata.cleanup.add_effect(
+            Effect.DEACTIVATE_TRIGGER,
             trigger_id=t.trigger_id
         )
 
@@ -713,6 +770,8 @@ def _impl_game_loop(tdata: TetrisData):
                 Effect.DEACTIVATE_TRIGGER,
                 trigger_id=selection_triggers[j].trigger_id
             )
+
+    _impl_move_left_right(tdata)
 
     tdata._game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER,
