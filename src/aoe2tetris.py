@@ -88,6 +88,7 @@ PLAYER_TETROMINO = {
 FY_TEST_SLOT_X = 10 # The first x coordinate for placing test pieces.
 FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 
+
 _SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
 
 
