@@ -20,8 +20,10 @@ from AoE2ScenarioParser.objects.units_obj import UnitsObject
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject
 from AoE2ScenarioParser.objects.variable_obj import VariableObject
+from action import Action
 from enum import Enum
 from btreenode import BTreeNode
+from probtree import ChanceNode, ProbTree
 from typing import Any, List, Tuple, Union
 import argparse
 import math
@@ -44,56 +46,6 @@ Board = List[List[UnitObject]]
 # the create object triggers.
 Test_FY_Triggers = Tuple[TriggerObject, List[List[TriggerObject]]]
 
-
-class ChanceNode:
-    """
-    A node in a probability tree representing a Chance and two paths.
-
-    The `percent` is the integer chance from `0` to `100` of succeeding the
-    Chance condition and choosing the left branch, with the right branch being
-    chosen on failure.
-    """
-
-    def __init__(
-            self,
-            percent: int,
-            success: TriggerObject,
-            failure: TriggerObject):
-        """
-        Constructs a new ChanceNode.
-
-        Parameters:
-            percent: The chance of succeeding the Chance condition.
-            success: The trigger to activate when the Chance succeeds.
-            failure: The trigger to activate when the Chance fails.
-
-        Raises:
-            ValueError: If `percent` is not within `0` to `100`, inclusive.
-        """
-        if percent < 0 or 100 < percent:
-            raise ValueError(f'{percent} must be in `0--100`, inclusive.')
-        self._percent = percent
-        self._success = success
-        self._failure = failure
-
-    @property
-    def percent(self) -> int:
-        """Returns the percent for the Chance condition."""
-        return self._percent
-
-    @property
-    def success(self) -> TriggerObject:
-        """Returns the success trigger for passing the Chance condition."""
-        return self._success
-
-    @property
-    def failure(self) -> TriggerObject:
-        """Returns the failure trigger for failing the Chance condition."""
-        return self._failure
-
-
-# A binary tree storing `TriggerObject`s or `int`s for generating random `int`s.
-ProbTree = BTreeNode[Union[ChanceNode, int]]
 
 SCN_EXT = 'aoe2scenario' # Scenario file extension.
 OUT_SCN_DIR = 'out-scns' # Output directory for built files.
@@ -136,21 +88,6 @@ FY_TEST_SLOT_X = 10 # The first x coordinate for placing test pieces.
 FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 
 SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
-
-
-class Action(Enum):
-    """
-    The actions a player may take during a game by pressing hotkeys.
-
-    The int value of each enum is the priority of the enum.
-    """
-    MOVE_LEFT = 1
-    MOVE_RIGHT = 2
-    ROTATE_CLOCKWISE = 3
-    ROTATE_COUNTERCLOCKWISE = 4
-    SOFT_DROP = 5
-    HARD_DROP = 6
-    HOLD = 7
 
 
 # Maps the building id of a select all building hotkey to the actions that
