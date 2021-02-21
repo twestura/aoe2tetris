@@ -8,7 +8,8 @@ class Action(Enum):
     """
     The actions a player may take during a game by pressing hotkeys.
 
-    The int value of each enum is the priority of the enum.
+    The int value of each enum is the priority of the enum, with the
+    lowest value representing the highest priority.
     """
     MOVE_LEFT = 1
     MOVE_RIGHT = 2

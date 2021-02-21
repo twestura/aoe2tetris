@@ -24,19 +24,16 @@ from action import Action
 from enum import Enum
 from btreenode import BTreeNode
 from probtree import ChanceNode, ProbTree
-from typing import Any, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 import argparse
 import math
 import os.path
 import random
 
-# Redefines the types to be less similar to "UnitObject" and "TriggerObject"
+# Redefines the "manager" types to be less similar to the "object" types.
 MMgr = MapObject
 UMgr = UnitsObject
 TMgr = TriggersObject
-
-# Game Board of units of dimension `TETRIS_ROWS` by `TETRIS_COLS`.
-Board = List[List[UnitObject]]
 
 # Trigger headers for testing Fisher Yates.
 # The first element is a trigger for running a test loop.
@@ -51,10 +48,14 @@ SCN_EXT = 'aoe2scenario' # Scenario file extension.
 OUT_SCN_DIR = 'out-scns' # Output directory for built files.
 OUT_FILENAME = 'Tetris' # Name of the main scenario.
 
-PLAYERS = [p for p in Player] # List of all player constants.
+PLAYERS = list(Player) # List of all player constants.
 
 TETRIS_ROWS = 20 # The number of rows in a game of tetris.
 TETRIS_COLS = 10 # The number of columns in a game of tetris.
+
+# Game Board of units of dimension `TETRIS_ROWS` by `TETRIS_COLS`.
+Board = List[List[UnitObject]]
+
 SQUARE_SPACE = 1.0 # The amount of space between Tetris game squares.
 
 BUILDING_X = 2 # The x-coordinate to place "select all hotkey" buildings.
@@ -87,7 +88,7 @@ PLAYER_TETROMINO = {
 FY_TEST_SLOT_X = 10 # The first x coordinate for placing test pieces.
 FY_TEST_SLOT_Y = 0 # The y coordinate for all test pieces.
 
-SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
+_SWAP_MESSAGE_GLOBAL = 0 # Hack to make each swap function have its own name.
 
 
 # Maps the building id of a select all building hotkey to the actions that
@@ -126,6 +127,7 @@ class HotkeyBuildings:
             )
             for bid in HOTKEY_BUILDINGS.keys()
         }
+        # TODO refactor this declaration because of dependency
         self._selection_triggers = None
 
     @property
@@ -144,8 +146,8 @@ class HotkeyBuildings:
         return self._init
 
     @property
-    def building_map(self):
-        """TODO specify and annotate type"""
+    def building_map(self) -> Dict[Building, UnitObject]:
+        """Returns a mapping from a building id to the unit paced on the map."""
         return self._building_map
 
     @property
@@ -158,10 +160,11 @@ class HotkeyBuildings:
         """
         return self._selection_triggers
 
-    def declare_selection_triggers(self, tmgr: TMgr):
+    def declare_selection_triggers(
+            self,
+            tmgr: TMgr) -> Dict[Building, TriggerObject]:
         """
         Declares the triggers for selecting buildings.
-        TODO add return type for dictionary
 
         Must be called near the start of the Game Loop to collect user input
         before the input is used in subsequent triggers.
@@ -179,10 +182,10 @@ def output_path() -> str:
 
 def _swap_msg(id0: int, id1: int) -> str:
     """Returns a string message for a `swap(id0, id1)` script call."""
-    global SWAP_MESSAGE_GLOBAL
-    SWAP_MESSAGE_GLOBAL += 1
+    global _SWAP_MESSAGE_GLOBAL
+    _SWAP_MESSAGE_GLOBAL += 1
     return '\n'.join([
-        f'void _{SWAP_MESSAGE_GLOBAL}() ' + '{',
+        f'void _{_SWAP_MESSAGE_GLOBAL}() ' + '{',
         f'    swap({id0}, {id1});',
         '}'
     ])
@@ -190,14 +193,13 @@ def _swap_msg(id0: int, id1: int) -> str:
 
 def _place_invisible_objects(umgr: UMgr):
     """Places invisible objects in the left corner of the map."""
-    for p in PLAYERS:
-        if p != Player.GAIA:
-            umgr.add_unit(
-                player=p,
-                unit_const=Unit.INVISIBLE_OBJECT,
-                x=0,
-                y=0,
-            )
+    for p in PLAYERS[1:]:
+        umgr.add_unit(
+            player=p,
+            unit_const=Unit.INVISIBLE_OBJECT,
+            x=0,
+            y=0,
+        )
 
 
 def _generate_game_board(mmgr: MMgr, umgr: UMgr) -> Board:
