@@ -14,26 +14,22 @@ from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.trigger_lists import Comparison, ObjectAttribute, Operation
 from AoE2ScenarioParser.datasets.units import Unit
-from AoE2ScenarioParser.objects.map_obj import MapObject
+from AoE2ScenarioParser.objects.map_obj import MapObject as MMgr
 from AoE2ScenarioParser.objects.unit_obj import UnitObject
-from AoE2ScenarioParser.objects.units_obj import UnitsObject
+from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
-from AoE2ScenarioParser.objects.triggers_obj import TriggersObject
-from AoE2ScenarioParser.objects.variable_obj import VariableObject
+from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
+from AoE2ScenarioParser.objects.variable_obj import VariableObject as Var
 from action import Action
 from enum import Enum
 from btreenode import BTreeNode
 from probtree import ChanceNode, ProbTree
 from typing import Any, Dict, List, Tuple, Union
+from variables import Variables
 import argparse
 import math
 import os.path
 import random
-
-# Redefines the "manager" types to be less similar to the "object" types.
-MMgr = MapObject
-UMgr = UnitsObject
-TMgr = TriggersObject
 
 # Trigger headers for testing Fisher Yates.
 # The first element is a trigger for running a test loop.
@@ -724,6 +720,7 @@ def build(args):
     # Builds the scenario in 2 phases:
     # 1. Define map and player info, place units, and declare triggers.
     # 2. Implement triggers.
+    variables = Variables(tmgr)
     tdata = TetrisData(mmgr, tmgr, umgr)
     impl_triggers(tdata, mmgr, tmgr, umgr)
 

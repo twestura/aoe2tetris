@@ -5,6 +5,7 @@
         "Longbowman",
         "Tetris",
         "Tetromino",
+        "Tetromino's",
         "blst",
         "btreenode",
         "cata",
@@ -13,8 +14,10 @@
         "pvars",
         "scns",
         "tdata",
+        "tetrominos",
         "tlst",
         "tmgr",
+        "tseq",
         "umgr"
     ]
 }
