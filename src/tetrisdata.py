@@ -46,8 +46,8 @@ def _generate_game_board(mmgr: MMgr, umgr: UMgr,
     rotation = 0.75 * math.pi
     theta = 0.25 * math.pi
 
-    start_x = center_x - 0.5 * ((cols - 1) * space)
-    start_y = center_y - 0.5 * ((rows - 1) * space)
+    start_x = center_x - 0.5 * space * (cols - 1)
+    start_y = center_y - 0.75 * space * (rows - 1)
 
     # rotation by theta
     # [[cos(theta) -sin(theta)] [[x]  = [[x cos(theta) - y sin(theta)]
@@ -202,6 +202,10 @@ class TetrisData:
         self._seq_init0 = _declare_sequence_init(tmgr, 'Init a')
         self._init_swap = tmgr.add_trigger('Init Swap', enabled=False)
         self._seq_init1 = _declare_sequence_init(tmgr, 'Init b')
+        self._place_init_piece = {
+            t : tmgr.add_trigger(f'Place Initial {t}', enabled=False)
+            for t in list(Tetromino)
+        }
 
         tmgr.add_trigger('-- Game Loop --')
         self._game_loop = tmgr.add_trigger(
@@ -242,6 +246,14 @@ class TetrisData:
         """Returns the second sequence initialization triggers."""
         return self._seq_init1
 
+    @property
+    def place_init_piece(self) -> Dict[Tetromino, TriggerObject]:
+        """
+        Returns the triggers for placing a Tetromino at the start.
+
+        Maps a Tetromino to the trigger for placing it.
+        """
+        return self._place_init_piece
 
     @property
     def begin_game(self) -> TriggerObject:

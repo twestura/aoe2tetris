@@ -35,23 +35,17 @@ import os.path
 import random
 
 
-# Trigger headers for testing Fisher Yates.
-# The first element is a trigger for running a test loop.
-# The second element is a `Tetromino.num()` by `Tetromino.num()` list indexed
-# by debug slot and then player colo.
-# TODO add the Fisher Yates randomization triggers along with the loop and
-# the create object triggers.
-Test_FY_Triggers = Tuple[TriggerObject, List[List[TriggerObject]]]
-
-
 SCN_EXT = 'aoe2scenario' # Scenario file extension.
 OUT_SCN_DIR = 'out-scns' # Output directory for built files.
 OUT_FILENAME = 'Tetris' # Name of the main scenario.
 
 PLAYERS = list(Player) # List of all player constants.
 
-TETRIS_ROWS = 20 # The number of rows in a game of tetris.
+TETRIS_ROWS = 40 # The number of rows in a game of tetris.
 TETRIS_COLS = 10 # The number of columns in a game of tetris.
+NUM_VISIBLE = 0.5 * TETRIS_ROWS # The number of visible rows in the Board.
+INIT_ROW = 19
+INIT_COL = 4
 
 SQUARE_SPACE = 1.0 # The amount of space between Tetris game squares.
 
@@ -101,6 +95,41 @@ def _swap_msg(id0: int, id1: int) -> str:
         f'    swap({id0}, {id1});',
         '}'
     ])
+
+
+def _impl_place_initial_piece(variables: Variables, tdata: TetrisData):
+    """
+    Implements placing the initial piece on the game board.
+
+    Required: the Tetromino sequences are randomized.
+    """
+    for tetromino, trigger in tdata.place_init_piece.items():
+        tdata.begin_game.add_effect(
+            Effect.ACTIVATE_TRIGGER,
+            trigger_id=trigger.trigger_id
+        )
+        trigger.add_condition(
+            Condition.VARIABLE_VALUE,
+            amount_or_quantity=tetromino.value,
+            variable=variables.tseq[0].var_id,
+            comparison=Comparison.EQUAL
+        )
+        for t in list(Tetromino):
+            if t != tetromino:
+                trigger.add_effect(
+                    Effect.DEACTIVATE_TRIGGER,
+                    trigger_id=tdata.place_init_piece[t].trigger_id
+                )
+        tile_unit = tdata.board[INIT_ROW + 1][INIT_COL]
+        trigger.add_effect(
+            Effect.REPLACE_OBJECT,
+            source_player=Player.GAIA,
+            target_player=tetromino.player,
+            selected_object_ids=tile_unit.reference_id,
+            object_list_unit_id_2=tetromino.unit
+        )
+        # TODO just places the center for now, needs to fill the other
+        # tiles as well
 
 
 def _impl_begin_game(variables: Variables, tdata: TetrisData):
@@ -173,6 +202,9 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData):
             ),
         )
     _impl_rand_trees(variables, tdata.seq_init1, t)
+
+    _impl_place_initial_piece(variables, tdata)
+
     t.add_effect(
         Effect.ACTIVATE_TRIGGER,
         trigger_id=tdata.game_loop.trigger_id
@@ -342,60 +374,6 @@ def _impl_rand_trees(
         _impl_rand_tree(variables, tree)
 
 
-def _test_impl_piece_display(tdata: TetrisData, tmgr: TMgr):
-    """
-    Implements the triggers for testing the Fisher-Yates Tetromino permutation.
-    """
-    current_vars = tdata.piece_vars[0]
-    main_loop_trigger, create_triggers = tdata._test_piece_triggers
-    main_loop_trigger.add_condition(Condition.TIMER, timer=5)
-    for p in PLAYERS[2:]:
-        main_loop_trigger.add_effect(
-            Effect.REMOVE_OBJECT,
-            source_player = p,
-            area_1_x=FY_TEST_SLOT_X,
-            area_1_y=FY_TEST_SLOT_Y,
-            area_2_x=FY_TEST_SLOT_X+Tetromino.num()-1,
-            area_2_y=FY_TEST_SLOT_Y
-        )
-    main_loop_trigger.add_effect(
-        Effect.ACTIVATE_TRIGGER,
-        trigger_id=tdata.activate_random.trigger_id
-    )
-    _impl_rand_trees(tdata, tmgr)
-    for s, slot_lst in enumerate(create_triggers):
-        var_id = current_vars[s].variable_id
-        for p, t in enumerate(slot_lst):
-            p_index = p+2
-            # TODO Fisher Yates randomization, need to change declaration order
-            main_loop_trigger.add_effect(
-                Effect.ACTIVATE_TRIGGER,
-                trigger_id=t.trigger_id
-            )
-            # Checks the Variable is set to the corresponding player.
-            t.add_condition(
-                Condition.VARIABLE_VALUE,
-                amount_or_quantity=p_index,
-                variable=var_id,
-                comparison=Comparison.EQUAL
-            )
-            player = Player(p_index)
-            t.add_effect(
-                Effect.CREATE_OBJECT,
-                object_list_unit_id=PLAYER_TETROMINO[player],
-                source_player=player,
-                location_x=FY_TEST_SLOT_X + s,
-                location_y=FY_TEST_SLOT_Y,
-                facet=4
-            )
-            # Deactivates all triggers in the same slot
-            for slot_trigger in slot_lst:
-                t.add_effect(
-                    Effect.DEACTIVATE_TRIGGER,
-                    trigger_id=slot_trigger.trigger_id
-                )
-
-
 def impl_triggers(
         variables: Variables,
         tdata: TetrisData,
@@ -403,12 +381,20 @@ def impl_triggers(
         tmgr: TMgr,
         umgr: UMgr):
     """Implements triggers using the data initialized in `tdata`."""
+    tdata.init_scenario.add_effect(
+        Effect.CHANGE_OWNERSHIP,
+        source_player=Player.ONE,
+        target_player=Player.GAIA,
+        selected_object_ids=[
+            unit.reference_id
+            for row in tdata.board
+            for unit in row
+        ]
+    )
+    _impl_hotkeys(variables, tdata)
     _impl_begin_game(variables, tdata)
     _impl_game_loop(variables, tdata)
-    _impl_hotkeys(variables, tdata)
-    # _impl_piece_vars(variables, tdata, tmgr)
     _impl_objectives(variables, tdata, tmgr)
-    # _test_impl_piece_display(tdata, tmgr)
 
 
 def build(args):
