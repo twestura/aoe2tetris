@@ -11,7 +11,10 @@ from AoE2ScenarioParser.objects.unit_obj import UnitObject
 from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
+from btreenode import BTreeNode
 from hotkeys import HotkeyBuildings, HOTKEY_BUILDINGS
+from probtree import ChanceNode, ProbTree
+from tetromino import Tetromino
 from variables import ScnVar
 
 
@@ -92,6 +95,68 @@ def _declare_score_objective(tmgr: TMgr, score_var: ScnVar) -> TriggerObject:
     )
 
 
+def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
+    """
+    Adds triggers for generating a random number between 0 and n inclusive.
+
+    `pre` is a prefix to prepend to the trigger names.
+    Raises a `ValueError` if `n` is nonpositive.
+    """
+    # TODO there are still some unnecessary triggers for swapping index 0.
+    if n < 1:
+        raise ValueError(f'{n} must be positive.')
+    name_prefix = f'{pre} Generate 0--{n}' if pre else f'Generate 0--{n}'
+    name_char = 'a'
+
+    def declare_range(left: int, right: int) -> ProbTree:
+        """Returns a `ProbTree` for generating numbers in `left:right`."""
+        nonlocal name_char
+        total = right - left
+        assert total > 1
+        mid = left + (right - left) // 2
+        num_left = mid - left
+        num_right = right - mid
+        percent = int(100.0 * round(num_left / total, 2))
+        success = tmgr.add_trigger(
+            f'{name_prefix} {name_char} success',
+            enabled=False
+        )
+        name_char = chr(ord(name_char) + 1)
+        failure = tmgr.add_trigger(
+            f'{name_prefix} {name_char} failure',
+            enabled=False
+        )
+        name_char = chr(ord(name_char) + 1)
+        return BTreeNode(
+            ChanceNode(percent, success, failure),
+            BTreeNode(left) if num_left == 1 else declare_range(left, mid),
+            BTreeNode(right - 1) if num_right == 1 else declare_range(mid, right)
+        )
+    return declare_range(0, n + 1)
+
+
+def _declare_rand_int_triggers(tmgr: TMgr, pre: str=None) -> List[ProbTree]:
+    """
+    Returns a list of Trees for generating random numbers.
+
+    That is, returns `[t6, t5, t4, t3, t2, t1]`, where tn is the tree used for
+    generating a random number from `0` through `n`, inclusive.
+    `pre` is a prefix to prepend to the trigger names.
+    """
+    return [_declare_prob_tree(tmgr, n, pre)
+            for n in range(Tetromino.num()-1, 0, -1)]
+
+
+def _declare_sequence_init(tmgr: TMgr, pre: str) -> List[ProbTree]:
+    """
+    Returns a list for the probability tree triggers needed to initialize
+    the Tetromino sequences at the start of the game.
+
+    `pre` is a prefix to prepend to the trigger names.
+    """
+    return _declare_rand_int_triggers(tmgr, pre)
+
+
 def _declare_selection_triggers(
         self,
         tmgr: TMgr) -> Dict[Building, TriggerObject]:
@@ -132,8 +197,13 @@ class TetrisData:
         self._new_game_objective = _declare_new_game_objective(tmgr)
         self._score_obj = _declare_score_objective(tmgr, score)
 
-        tmgr.add_trigger('-- Game Loop --')
+        tmgr.add_trigger('-- Begin Game --')
         self._begin_game = tmgr.add_trigger('Begin Game')
+        self._seq_init0 = _declare_sequence_init(tmgr, 'Init a')
+        self._init_swap = tmgr.add_trigger('Init Swap', enabled=False)
+        self._seq_init1 = _declare_sequence_init(tmgr, 'Init b')
+
+        tmgr.add_trigger('-- Game Loop --')
         self._game_loop = tmgr.add_trigger(
             'Game Loop', enabled=False, looping=True
         )
@@ -153,6 +223,25 @@ class TetrisData:
     def new_game_objective(self) -> TriggerObject:
         """Returns a trigger for an objective to start a new game."""
         return self._new_game_objective
+
+    @property
+    def seq_init0(self) -> List[ProbTree]:
+        """Returns the first sequence initialization triggers."""
+        return self._seq_init0
+
+    @property
+    def swap_init(self) -> TriggerObject:
+        """
+        Returns a trigger for swapping the Tetromino sequences during
+        initialization.
+        """
+        return self._init_swap
+
+    @property
+    def seq_init1(self) -> List[ProbTree]:
+        """Returns the second sequence initialization triggers."""
+        return self._seq_init1
+
 
     @property
     def begin_game(self) -> TriggerObject:

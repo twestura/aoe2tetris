@@ -103,75 +103,6 @@ def _swap_msg(id0: int, id1: int) -> str:
     ])
 
 
-def _declare_prob_tree(tmgr: TMgr, n: int) -> ProbTree:
-    """
-    Adds triggers for generating a random number between 0 and n inclusive.
-
-    Raises a `ValueError` if `n` is nonpositive.
-    """
-    # TODO there are still some unnecessary triggers for swapping index 0.
-    if n < 1:
-        raise ValueError(f'{n} must be positive.')
-    name_prefix = f'Generate 0--{n}'
-    name_char = 'a'
-
-    def declare_range(left: int, right: int) -> ProbTree:
-        """Returns a `ProbTree` for generating numbers in `left:right`."""
-        nonlocal name_char
-        total = right - left
-        assert total > 1
-        mid = left + (right - left) // 2
-        num_left = mid - left
-        num_right = right - mid
-        percent = int(100.0 * round(num_left / total, 2))
-        success = tmgr.add_trigger(
-            f'{name_prefix} {name_char} success',
-            enabled=False
-        )
-        name_char = chr(ord(name_char) + 1)
-        failure = tmgr.add_trigger(
-            f'{name_prefix} {name_char} failure',
-            enabled=False
-        )
-        name_char = chr(ord(name_char) + 1)
-        return BTreeNode(
-            ChanceNode(percent, success, failure),
-            BTreeNode(left) if num_left == 1 else declare_range(left, mid),
-            BTreeNode(right - 1) if num_right == 1 else declare_range(mid, right)
-        )
-    return declare_range(0, n + 1)
-
-
-def _declare_activate_random(tmgr: TMgr) -> TriggerObject:
-    """Returns a trigger declaration for activating random number generation."""
-    return tmgr.add_trigger('Fisher Yates Permutation', enabled=False)
-
-
-def _declare_rand_int_triggers(tmgr: TMgr) -> List[ProbTree]:
-    """
-    Returns a list of Trees for generating random numbers.
-
-    That is, returns `[t6, t5, t4, t3, t2, t1]`, where tn is the tree used for
-    generating a random number from `0` through `n`, inclusive.
-    """
-    return [_declare_prob_tree(tmgr, n)
-            for n in range(Tetromino.num()-1, 0, -1)]
-
-
-def _declare_test_piece_triggers(tmgr: TMgr) -> Test_FY_Triggers:
-    """TODO specify, testing function."""
-    main_loop = tmgr.add_trigger('Randomize And Place Test Row', looping=True)
-    triggers = [[None] * Tetromino.num() for __ in range(Tetromino.num())]
-    for k in range(Tetromino.num()):
-        for (p, player) in enumerate(PLAYERS[2:]):
-            color = PLAYER_COLOR_NAMES[player]
-            triggers[k][p] = tmgr.add_trigger(
-                f'Place {color} in slot {k}',
-                enabled=False
-            )
-    return (main_loop, triggers)
-
-
 def _impl_begin_game(variables: Variables, tdata: TetrisData):
     """
     Implents the trigger to initialize the game and begin the game loop.
@@ -212,6 +143,36 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData):
         Effect.ACTIVATE_TRIGGER,
         trigger_id=tdata.score_objective.trigger_id
     )
+
+    # Sets Tetromino Variable Values.
+    for v in variables.tseq:
+        t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=v.init,
+            operation=Operation.SET,
+            from_variable=v.var_id
+        )
+    t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=variables.seq_index.init,
+            operation=Operation.SET,
+            from_variable=variables.seq_index.var_id
+    )
+
+    _impl_rand_trees(variables, tdata.seq_init0, t)
+    t.add_effect(
+        Effect.ACTIVATE_TRIGGER,
+        trigger_id=tdata.swap_init.trigger_id
+    )
+    for k in range(Tetromino.num()):
+        tdata.swap_init.add_effect(
+            Effect.SCRIPT_CALL,
+            message=_swap_msg(
+                variables.tseq[k].var_id,
+                variables.tseq[k+Tetromino.num()].var_id
+            ),
+        )
+    _impl_rand_trees(variables, tdata.seq_init1, t)
     t.add_effect(
         Effect.ACTIVATE_TRIGGER,
         trigger_id=tdata.game_loop.trigger_id
@@ -323,8 +284,6 @@ def _impl_objectives(variables: Variables, tdata: TetrisData, tmgr: TMgr):
 
 def _impl_rand_tree(
         variables: Variables,
-        tdata: TetrisData,
-        tmgr: TMgr,
         tree: ProbTree):
     """
     Implements the triggers for `tree`.
@@ -334,8 +293,8 @@ def _impl_rand_tree(
         are activated by a trigger that occurs in `tmgr`'s trigger list
         before any of the `success` or `failure` triggers in the tree.
     """
-    current_pieces = tdata.piece_vars[0]
-    var_id0 = current_pieces[0].variable_id
+    current_pieces = variables.tseq[:Tetromino.num()]
+    var_id0 = current_pieces[0].var_id
     nodes = [tree] # The internal tree nodes with triggers to implement.
     while nodes:
         n = nodes.pop()
@@ -355,7 +314,7 @@ def _impl_rand_tree(
                 # of the variable at any nonzero index.
                 k = child.data
                 if k != 0:
-                    var_id = current_pieces[k].variable_id
+                    var_id = current_pieces[k].var_id
                     trigger.add_effect(
                         Effect.SCRIPT_CALL,
                         message=_swap_msg(var_id0, var_id)
@@ -369,15 +328,18 @@ def _impl_rand_tree(
                     )
 
 
-def _impl_rand_trees(tdata: TetrisData, tmgr: TMgr):
+def _impl_rand_trees(
+        variables: Variables,
+        seq: List[PropTree],
+        activator: TriggerObject):
     """Implements the random tree triggers used in Fisher Yates."""
-    for tree in tdata.rand_int_trees:
+    for tree in seq:
         for t in (tree.data.success, tree.data.failure):
-            tdata.activate_random.add_effect(
+            activator.add_effect(
                 Effect.ACTIVATE_TRIGGER,
                 trigger_id=t.trigger_id
             )
-        _impl_rand_tree(tdata, tmgr, tree)
+        _impl_rand_tree(variables, tree)
 
 
 def _test_impl_piece_display(tdata: TetrisData, tmgr: TMgr):

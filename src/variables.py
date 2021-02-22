@@ -50,7 +50,11 @@ class Variables:
         self._selected = ScnVar(tmgr, 'Selected Building', 0)
         tetrominos = list(Tetromino)
         self._tseq = [
-            ScnVar(tmgr, f'Tetromino {k}', tetrominos[k % Tetromino.num()])
+            ScnVar(
+                tmgr,
+                f'Tetromino {k}',
+                tetrominos[k % Tetromino.num()].value
+            )
             for k in range(2 * Tetromino.num())
         ]
         self._seq_index = ScnVar(tmgr, 'Current Tetromino Index', 0)
