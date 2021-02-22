@@ -3,7 +3,37 @@
 from AoE2ScenarioParser.objects.triggers_obj import TriggerObject as TMgr
 from AoE2ScenarioParser.objects.variable_obj import VariableObject as Var
 from typing import List
+from direction import Direction
 from tetromino import Tetromino
+
+
+class ScnVar:
+    """An instance represents a variable object and its initial value."""
+
+    def __init__(self, tmgr: TMgr, name: str, init: int):
+        """Initializes a new Variable with the given name and initial value."""
+        self._var = tmgr.add_variable(name)
+        self._init = init
+
+    @property
+    def var(self) -> Var:
+        """Returns the variable object used for this var in the scenario."""
+        return self._var
+
+    @property
+    def init(self) -> int:
+        """Returns this variable's initial value."""
+        return self._init
+
+    @property
+    def var_id(self) -> int:
+        """Returns this variable's id number."""
+        return self._var.variable_id
+
+    @property
+    def name(self) -> str:
+        """Returns the name of this variable."""
+        return self._var.name
 
 
 class Variables:
@@ -16,17 +46,21 @@ class Variables:
         Parameters:
             tmgr: A scenario's trigger manager.
         """
-        self._score = tmgr.add_variable('Score')
-        self._selected = tmgr.add_variable('Selected Building')
-        self._tseq = [tmgr.add_variable(f'Tetromino {k}')
-                      for k in range(2 * Tetromino.num())]
-        self._seq_index = tmgr.add_variable('Current Tetromino Index')
-        self._facing = tmgr.add_variable('Facing')
-        self._row = tmgr.add_variable('Row Index')
-        self._col = tmgr.add_variable('Col Index')
+        self._score = ScnVar(tmgr, 'Score', 0)
+        self._selected = ScnVar(tmgr, 'Selected Building', 0)
+        tetrominos = list(Tetromino)
+        self._tseq = [
+            ScnVar(tmgr, f'Tetromino {k}', tetrominos[k % Tetromino.num()])
+            for k in range(2 * Tetromino.num())
+        ]
+        self._seq_index = ScnVar(tmgr, 'Current Tetromino Index', 0)
+        self._facing = ScnVar(tmgr, 'Facing', Direction.U.value)
+        # TODO remove magic numbers
+        self._row = ScnVar(tmgr, 'Row Index', 19)
+        self._col = ScnVar(tmgr, 'Col Index', 4)
 
     @property
-    def score(self) -> Var:
+    def score(self) -> ScnVar:
         """
         Returns a variable for the player's Tetris score.
 
@@ -35,7 +69,7 @@ class Variables:
         return self._score
 
     @property
-    def selected(self) -> Var:
+    def selected(self) -> ScnVar:
         """
         Returns a variable for the player's select building.
 
@@ -46,7 +80,7 @@ class Variables:
         return self._selected
 
     @property
-    def tseq(self) -> List[Var]:
+    def tseq(self) -> List[ScnVar]:
         """
         Returns a list of variables for generating a sequence of Tetrominos.
 
@@ -56,7 +90,7 @@ class Variables:
         return self._tseq
 
     @property
-    def seq_index(self) -> Var:
+    def seq_index(self) -> ScnVar:
         """
         Returns a variable containing the index in the Tetromino sequence.
 
@@ -66,7 +100,7 @@ class Variables:
         return self._seq_index
 
     @property
-    def facing(self) -> Var:
+    def facing(self) -> ScnVar:
         """
         Returns a variable to represent the active Tetromino's facing direction.
 
@@ -76,7 +110,7 @@ class Variables:
         return self._facing
 
     @property
-    def row(self) -> Var:
+    def row(self) -> ScnVar:
         """
         Returns a variable containing the active Tetromino's row index.
 
@@ -86,7 +120,7 @@ class Variables:
         return self._row
 
     @property
-    def col(self) -> Var:
+    def col(self) -> ScnVar:
         """
         Returns a variable containing the active Tetromino's col index.
 

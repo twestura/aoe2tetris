@@ -56,8 +56,9 @@ The hotkeys and their actions are described in the following table and topic par
 | Rotate Clockwise           | Select All Stables         | 3     |
 | Rotate Counterclockwise    | Select All Markets         | 4     |
 | Soft Drop                  | Select All Monasteries     | 5     |
-| Hard Drop (and Start Game) | Select All Castles         | 6     |
+| Hard Drop                  | Select All Castles         | 6     |
 | Hold                       | Select All Siege Workshops | 7     |
+| Begin Game or Reset        | Select All Universities    | 8     |
 
 The player has two of each building on the map.
 The buildings begin the scenario being owned by the player, but are switched to the Gaia player at the beginning of the scenario.

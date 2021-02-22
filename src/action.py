@@ -18,3 +18,4 @@ class Action(Enum):
     SOFT_DROP = 5
     HARD_DROP = 6
     HOLD = 7
+    NEW_GAME = 8
