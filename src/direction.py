@@ -10,3 +10,8 @@ class Direction(Enum):
     R = auto()
     D = auto()
     L = auto()
+
+
+# TODO map to facet/rotation for setting unit direction
+# can that even be replaced?
+# would then need 4 sets of Invisible objects...

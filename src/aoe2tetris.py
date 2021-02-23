@@ -24,7 +24,9 @@ from action import Action
 from enum import Enum
 from typing import Any, Dict, List, Tuple, Union
 from btreenode import BTreeNode
+from direction import Direction
 from hotkeys import HotkeyBuildings, HOTKEY_BUILDINGS
+from index import Index
 from probtree import ChanceNode, ProbTree
 from tetrisdata import TetrisData
 from tetromino import Tetromino
@@ -86,6 +88,18 @@ def output_path() -> str:
     return os.path.join(OUT_SCN_DIR, f'{OUT_FILENAME}.{SCN_EXT}')
 
 
+def _is_in_bounds(index: Index) -> bool:
+    """Returns `True` if `index` is a tile on the game board, `False` if not."""
+    return 0 <= index.row < TETRIS_ROWS and 0 <= index.col < TETRIS_COLS
+
+
+def _is_visible(index: Index) -> bool:
+    """Returns `True` if `index` is in the visible part of the board."""
+    return (
+        NUM_VISIBLE <= index.row < TETRIS_ROWS and 0 <= index.col < TETRIS_COLS
+    )
+
+
 def _swap_msg(id0: int, id1: int) -> str:
     """Returns a string message for a `swap(id0, id1)` script call."""
     global _SWAP_MESSAGE_GLOBAL
@@ -95,6 +109,20 @@ def _swap_msg(id0: int, id1: int) -> str:
         f'    swap({id0}, {id1});',
         '}'
     ])
+
+
+def _impl_init_invisible_object_ownership(tdata: TetrisData):
+    """Implements converting the game board from Player one to Gaia."""
+    tdata.init_scenario.add_effect(
+        Effect.CHANGE_OWNERSHIP,
+        source_player=Player.ONE,
+        target_player=Player.GAIA,
+        selected_object_ids=[
+            unit.reference_id
+            for row in tdata.board
+            for unit in row
+        ]
+    )
 
 
 def _impl_place_initial_piece(variables: Variables, tdata: TetrisData):
@@ -120,16 +148,18 @@ def _impl_place_initial_piece(variables: Variables, tdata: TetrisData):
                     Effect.DEACTIVATE_TRIGGER,
                     trigger_id=tdata.place_init_piece[t].trigger_id
                 )
-        tile_unit = tdata.board[INIT_ROW + 1][INIT_COL]
-        trigger.add_effect(
-            Effect.REPLACE_OBJECT,
-            source_player=Player.GAIA,
-            target_player=tetromino.player,
-            selected_object_ids=tile_unit.reference_id,
-            object_list_unit_id_2=tetromino.unit
-        )
-        # TODO just places the center for now, needs to fill the other
-        # tiles as well
+        center = Index(INIT_ROW + 1, INIT_COL)
+        for index in tetromino.indices:
+            point = index + center
+            if _is_visible(point):
+                tile_unit = tdata.board[point.row][point.col]
+                trigger.add_effect(
+                    Effect.REPLACE_OBJECT,
+                    source_player=Player.GAIA,
+                    target_player=tetromino.player,
+                    selected_object_ids=tile_unit.reference_id,
+                    object_list_unit_id_2=tetromino.unit
+                )
 
 
 def _impl_begin_game(variables: Variables, tdata: TetrisData):
@@ -302,7 +332,7 @@ def _impl_hotkeys(variables: Variables, tdata: TetrisData):
     )
 
 
-def _impl_objectives(variables: Variables, tdata: TetrisData, tmgr: TMgr):
+def _impl_objectives(variables: Variables, tdata: TetrisData):
     """Implements the triggers to initialize and display player score."""
     tdata.new_game_objective.add_condition(
         Condition.PLAYER_DEFEATED,
@@ -374,27 +404,13 @@ def _impl_rand_trees(
         _impl_rand_tree(variables, tree)
 
 
-def impl_triggers(
-        variables: Variables,
-        tdata: TetrisData,
-        mmgr: MMgr,
-        tmgr: TMgr,
-        umgr: UMgr):
+def impl_triggers(variables: Variables, tdata: TetrisData):
     """Implements triggers using the data initialized in `tdata`."""
-    tdata.init_scenario.add_effect(
-        Effect.CHANGE_OWNERSHIP,
-        source_player=Player.ONE,
-        target_player=Player.GAIA,
-        selected_object_ids=[
-            unit.reference_id
-            for row in tdata.board
-            for unit in row
-        ]
-    )
+    _impl_init_invisible_object_ownership(tdata)
     _impl_hotkeys(variables, tdata)
     _impl_begin_game(variables, tdata)
     _impl_game_loop(variables, tdata)
-    _impl_objectives(variables, tdata, tmgr)
+    _impl_objectives(variables, tdata)
 
 
 def build(args):
@@ -423,7 +439,7 @@ def build(args):
     tdata = TetrisData(mmgr, tmgr, umgr, variables.score,
                        BUILDING_X, BUILDING_Y,
                        TETRIS_ROWS, TETRIS_COLS, SQUARE_SPACE)
-    impl_triggers(variables, tdata, mmgr, tmgr, umgr)
+    impl_triggers(variables, tdata)
 
     scn.write_to_file(output_path())
 
@@ -431,7 +447,6 @@ def build(args):
 def scratch(_args):
     """Scratch function for executing tests."""
     print('grassDauT')
-    print(PLAYERS)
 
 
 def main():

@@ -18,6 +18,11 @@ from tetromino import Tetromino
 from variables import ScnVar
 
 
+# Unit constant for a map revealer, which isn't in any of the libraries.
+# Replace if library is updated for "Other" units.
+MAP_REVEALER = 837
+
+
 # Game Board of units of dimension `TETRIS_ROWS` by `TETRIS_COLS`.
 Board = List[List[UnitObject]]
 
@@ -78,7 +83,8 @@ def _declare_new_game_objective(tmgr: TMgr) -> TriggerObject:
         display_as_objective=True,
         display_on_screen=True,
         description=display_string,
-        short_description=display_string
+        short_description=display_string,
+        mute_objectives=True,
     )
 
 
@@ -91,6 +97,7 @@ def _declare_score_objective(tmgr: TMgr, score_var: ScnVar) -> TriggerObject:
         display_on_screen=True,
         description=display_string,
         short_description=display_string,
+        mute_objectives=True,
         enabled=False
     )
 
@@ -102,7 +109,7 @@ def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
     `pre` is a prefix to prepend to the trigger names.
     Raises a `ValueError` if `n` is nonpositive.
     """
-    # TODO there are still some unnecessary triggers for swapping index 0.
+    # Note there are still some unnecessary triggers for swapping index 0.
     if n < 1:
         raise ValueError(f'{n} must be positive.')
     name_prefix = f'{pre} Generate 0--{n}' if pre else f'Generate 0--{n}'
@@ -130,7 +137,7 @@ def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
         return BTreeNode(
             ChanceNode(percent, success, failure),
             BTreeNode(left) if num_left == 1 else declare_range(left, mid),
-            BTreeNode(right - 1) if num_right == 1 else declare_range(mid, right)
+            BTreeNode(right-1) if num_right == 1 else declare_range(mid, right)
         )
     return declare_range(0, n + 1)
 
@@ -186,6 +193,19 @@ class TetrisData:
         `building_x` is the x tile coordinate for spawning selection buildings.
         `building_y` is the y tile coordinate for spawning selection buildings.
         """
+
+        # TODO remove test map revealers
+        revealer_len = mmgr.map_width // 2
+        revlenadj = 15
+        for x in range(revealer_len - revlenadj, revealer_len + revlenadj):
+            for y in range(revealer_len - revlenadj, revealer_len + revlenadj):
+                umgr.add_unit(
+                    player = Player.ONE,
+                    unit_const=MAP_REVEALER,
+                    x=x,
+                    y=y
+                )
+
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(umgr, building_x, building_y)
         self._board = _generate_game_board(mmgr, umgr, rows, cols, space)
