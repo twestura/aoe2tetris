@@ -13,7 +13,7 @@ HOTKEY_BUILDINGS = {
     Building.ARCHERY_RANGE: Action.MOVE_LEFT,
     Building.BLACKSMITH: Action.MOVE_RIGHT,
     Building.STABLE: Action.ROTATE_CLOCKWISE,
-    Building.MARKET: Action.ROTATE_COUNTERCLOCKWISE,
+    Building.KREPOST: Action.ROTATE_COUNTERCLOCKWISE,
     Building.MONASTERY: Action.SOFT_DROP,
     Building.CASTLE: Action.HARD_DROP,
     Building.SIEGE_WORKSHOP: Action.HOLD,

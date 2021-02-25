@@ -54,7 +54,7 @@ The hotkeys and their actions are described in the following table and topic par
 | Move Left                  | Select All Archery Ranges  | 1     |
 | Move Right                 | Select All Barracks        | 2     |
 | Rotate Clockwise           | Select All Stables         | 3     |
-| Rotate Counterclockwise    | Select All Markets         | 4     |
+| Rotate Counterclockwise    | Select All Kreposts        | 4     |
 | Soft Drop                  | Select All Monasteries     | 5     |
 | Hard Drop                  | Select All Castles         | 6     |
 | Hold                       | Select All Siege Workshops | 7     |
