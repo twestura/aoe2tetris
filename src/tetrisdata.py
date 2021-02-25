@@ -117,10 +117,17 @@ def _declare_debug_objectives(
     tmgr: TMgr, variables: Variables
 ) -> List[TriggerObject]:
     """Declares objectives for displaying variable debug information."""
-    display_string = "\n".join(
+    seq_string = "\n".join(
         [
             f"seq0: <{variables.sequences[0].name}>",
             f"seq1: <{variables.sequences[1].name}>",
+        ]
+    )
+    pos_string = "\n".join(
+        [
+            f"row: <{variables.row.name}>",
+            f"col: <{variables.col.name}>",
+            f"facing: <{variables.facing.name}>",
         ]
     )
     return [
@@ -129,8 +136,17 @@ def _declare_debug_objectives(
             enabled=False,
             display_as_objective=True,
             display_on_screen=True,
-            description=display_string,
-            short_description=display_string,
+            description=seq_string,
+            short_description=seq_string,
+            mute_objectives=True,
+        ),
+        tmgr.add_trigger(
+            "Tetromino Position Debug",
+            enabled=False,
+            display_as_objective=True,
+            display_on_screen=True,
+            description=pos_string,
+            short_description=pos_string,
             mute_objectives=True,
         ),
     ]

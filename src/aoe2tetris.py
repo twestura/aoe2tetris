@@ -121,6 +121,24 @@ def _impl_place_initial_piece(
                     trigger_id=tdata.place_init_piece[t].trigger_id,
                 )
         center = Index(INIT_ROW + 1, INIT_COL)
+        trigger.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=center.row,
+            from_variable=variables.row.var_id,
+            operation=Operation.SET,
+        )
+        trigger.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=center.col,
+            from_variable=variables.col.var_id,
+            operation=Operation.SET,
+        )
+        trigger.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=Direction.U.value,
+            from_variable=variables.facing.var_id,
+            operation=Operation.SET,
+        )
         for index in tetromino.indices():
             point = index + center
             if tdata.board.is_visible(point):
@@ -143,7 +161,8 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     * Displays the score as an objective.
     * Randomizes the beginning 2 sequences of Tetrominos.
     * Sets the Tetromino sequence index to 0.
-    * Places the first piece on the game board.
+    * Sets the game board to be empty.
+    * Places the first active piece on the game board.
     """
     t = tdata.begin_game
 
@@ -163,13 +182,22 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         selected_object_ids=university_id,
     )
 
-    # Sets and displays the starting score.
-    t.add_effect(
-        Effect.CHANGE_VARIABLE,
-        quantity=variables.score.init,
-        from_variable=variables.score.var_id,
-        operation=Operation.SET,
-    )
+    init_vars = []
+    init_vars.append(variables.score)
+    for row in variables.board_tiles:
+        for v in row:
+            init_vars.append(v)
+    for v in variables.sequences:
+        init_vars.append(v)
+    init_vars.append(variables.seq_index)
+    for v in init_vars:
+        t.add_effect(
+            Effect.CHANGE_VARIABLE,
+            quantity=v.init,
+            operation=Operation.SET,
+            from_variable=v.var_id,
+        )
+
     t.add_effect(
         Effect.DEACTIVATE_TRIGGER,
         trigger_id=tdata.new_game_objective.trigger_id,
@@ -177,24 +205,8 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     t.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.score_objective.trigger_id
     )
-
-    # Initializes the random Tetromino sequence variables.
-    for v in variables.sequences:
-        t.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=v.init,
-            operation=Operation.SET,
-            from_variable=v.var_id,
-        )
-    t.add_effect(
-        Effect.CHANGE_VARIABLE,
-        quantity=variables.seq_index.init,
-        operation=Operation.SET,
-        from_variable=variables.seq_index.var_id,
-    )
     _impl_rand_trees(0, tdata.seq_init0, t, xs)
     _impl_rand_trees(1, tdata.seq_init1, t, xs)
-
     _impl_place_initial_piece(variables, tdata, xs)
 
     t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id)
