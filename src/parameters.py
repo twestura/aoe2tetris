@@ -14,7 +14,7 @@ class TetrisParameters:
 
         This value is a positive `int`.
         """
-        pass # TODO implement
+        pass  # TODO implement
 
     @property
     def num_cols(self):
@@ -23,7 +23,7 @@ class TetrisParameters:
 
         This value is a positive `int`.
         """
-        pass # TODO implement
+        pass  # TODO implement
 
     @property
     def num_visible(self):
@@ -32,8 +32,8 @@ class TetrisParameters:
 
         Satisfies `0 < self.num_visible < self.num_rows`.
         """
-        pass # TODO implement
+        pass  # TODO implement
 
-    def _inv(self) -> boolean:
+    def _inv(self) -> bool:
         """Returns `True` if the class invariant is satisfied, else `False`."""
         pass

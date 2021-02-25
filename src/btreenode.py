@@ -5,17 +5,18 @@ from __future__ import annotations
 from typing import Generic, Optional, TypeVar
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class BTreeNode(Generic[T]):
     """A Binary Tree Node with data and left and right children."""
 
     def __init__(
-            self,
-            data: T,
-            left: Optional[BTreeNode[T]]=None,
-            right: Optional[BTreeNode[T]]=None):
+        self,
+        data: T,
+        left: Optional[BTreeNode[T]] = None,
+        right: Optional[BTreeNode[T]] = None,
+    ):
         """
         Initializes a new Binary Tree Node.
 

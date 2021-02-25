@@ -1,17 +1,50 @@
 """Represents the direction in which a Tetromino may face or move."""
 
 
-from enum import Enum, auto
+import math
+from enum import Enum
+import index
 
 
 class Direction(Enum):
     """Represents the direction in which a Tetromino may face or move."""
-    U = auto()
-    R = auto()
-    D = auto()
-    L = auto()
+
+    U = 1
+    R = 2
+    D = 3
+    L = 4
+
+    @property
+    def facing(self) -> float:
+        """
+        Returns the radian angle of the direction.
+
+        The game measures angles with 0 being along the x-axis that runs
+        from the western corner to the northern corner. Angles increase
+        clockwise, with the y-axis running from the western corner to the
+        southern corner.
+        """
+        return _ANGLES[self]
+
+    @property
+    def offset(self) -> index.Index:
+        """Returns the offset to move one coordinate in this direction."""
+        return _OFFSETS[self]
 
 
-# TODO map to facet/rotation for setting unit direction
-# can that even be replaced?
-# would then need 4 sets of Invisible objects...
+# The radian angle of the direction.
+_ANGLES = {
+    Direction.R: 0.25 * math.pi,
+    Direction.D: 0.75 * math.pi,
+    Direction.L: 1.25 * math.pi,
+    Direction.U: 1.75 * math.pi,
+}
+
+
+# The offset point when moving one tile in a given direction.
+_OFFSETS = {
+    Direction.R: index.Index(0, 1),
+    Direction.D: index.Index(1, 0),
+    Direction.L: index.Index(0, -1),
+    Direction.U: index.Index(-1, 0),
+}

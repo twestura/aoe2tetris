@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from typing import Set
+import direction
 from rotation import Rotation
 
 
@@ -25,7 +26,7 @@ class Index:
         return self._c
 
     def __str__(self):
-        return f'({self._row}, {self._col})'
+        return f"({self._r}, {self._c})"
 
     def __eq__(self, other):
         return (
@@ -51,6 +52,23 @@ class Index:
         """Returns an index equal to `self` rotated by the rotation."""
         return (
             Index(self._c, -self._r)
-            if r == Rotation.CW else
-            Index(-self._c, self._r)
+            if r == Rotation.CW
+            else Index(-self._c, self._r)
         )
+
+    @staticmethod
+    def adjacent_indices(
+        indices: Set[Index], d: direction.Direction
+    ) -> Set[Index]:
+        """
+        Returns the set of coordinates adjacent to the coordinates in indices in
+        the given direction.
+
+        Does not return repeat coordinates if they already are contianed
+        within `indices`.
+        """
+        return {
+            index + d.offset
+            for index in indices
+            if (index + d.offset) not in indices
+        }

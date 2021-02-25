@@ -11,6 +11,7 @@ class Action(Enum):
     The int value of each enum is the priority of the enum, with the
     lowest value representing the highest priority.
     """
+
     MOVE_LEFT = 1
     MOVE_RIGHT = 2
     ROTATE_CLOCKWISE = 3

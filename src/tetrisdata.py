@@ -2,20 +2,29 @@
 
 
 import math
-from typing import Dict, List
+from typing import Dict, List, Optional
 from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
 from AoE2ScenarioParser.objects.map_obj import MapObject as MMgr
-from AoE2ScenarioParser.objects.unit_obj import UnitObject
 from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
+from board import Board
 from btreenode import BTreeNode
+from direction import Direction
 from hotkeys import HotkeyBuildings, HOTKEY_BUILDINGS
+from index import Index
 from probtree import ChanceNode, ProbTree
 from tetromino import Tetromino
-from variables import ScnVar
+from variables import ScnVar, Variables
+
+
+# Type of the move triggers.
+# For each tile in the game board, each piece that can be placed at that tile,
+# and each direction that piece can face, there is a trigger for moving
+# the piece if doing so would keep it on the game board.
+MoveTriggers = List[List[Dict[Tetromino, Dict[Direction, TriggerObject]]]]
 
 
 # Unit constant for a map revealer, which isn't in any of the libraries.
@@ -23,8 +32,8 @@ from variables import ScnVar
 MAP_REVEALER = 837
 
 
-# Game Board of units of dimension `TETRIS_ROWS` by `TETRIS_COLS`.
-Board = List[List[UnitObject]]
+DIRECTIONS = list(Direction)  # List of all possible facing directions.
+TETROMINOS = list(Tetromino)  # List of all Tetris pieces.
 
 
 def _place_invisible_objects(umgr: UMgr):
@@ -38,8 +47,9 @@ def _place_invisible_objects(umgr: UMgr):
         )
 
 
-def _generate_game_board(mmgr: MMgr, umgr: UMgr,
-                         rows: int, cols: int, space: float) -> Board:
+def _generate_game_board(
+    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space: float
+) -> Board:
     """
     Places units in the middle of the map to use as the game board.
 
@@ -58,28 +68,29 @@ def _generate_game_board(mmgr: MMgr, umgr: UMgr,
     # [[cos(theta) -sin(theta)] [[x]  = [[x cos(theta) - y sin(theta)]
     #  [sin(theta) cos(theta)]]  [y]]    [x sin(theta) + y cos(theta)]]
 
-    pieces = [[None] * cols for __ in range(rows)]
+    board = Board(rows, cols)
     for r in range(rows):
         for c in range(cols):
-            x0 = (start_x + c * space - center_x)
-            y0 = (start_y + r * space - center_y)
+            x0 = start_x + c * space - center_x
+            y0 = start_y + r * space - center_y
             x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
             y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
-            pieces[r][c] = umgr.add_unit(
-                player=Player.ONE,
-                unit_const=Unit.INVISIBLE_OBJECT,
-                x=x,
-                y=y,
-                rotation=rotation
-            )
-    return pieces
+            for d in DIRECTIONS:
+                board[Index(r, c)][d] = umgr.add_unit(
+                    player=Player.ONE,
+                    unit_const=Unit.INVISIBLE_OBJECT,
+                    x=x,
+                    y=y,
+                    rotation=rotation,
+                )
+    return board
 
 
 def _declare_new_game_objective(tmgr: TMgr) -> TriggerObject:
     """Declares a trigger objective prompting to start a new game."""
     display_string = 'Press "Select all Universities" to begin a new game.'
     return tmgr.add_trigger(
-        'New Game Instructions Objective',
+        "New Game Instructions Objective",
         display_as_objective=True,
         display_on_screen=True,
         description=display_string,
@@ -90,19 +101,42 @@ def _declare_new_game_objective(tmgr: TMgr) -> TriggerObject:
 
 def _declare_score_objective(tmgr: TMgr, score_var: ScnVar) -> TriggerObject:
     """Declares a trigger for the score objective."""
-    display_string = f'Score: <{score_var.name}>'
+    display_string = f"Score: <{score_var.name}>"
     return tmgr.add_trigger(
-        'Score Objective',
+        "Score Objective",
         display_as_objective=True,
         display_on_screen=True,
         description=display_string,
         short_description=display_string,
         mute_objectives=True,
-        enabled=False
+        enabled=False,
     )
 
 
-def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
+def _declare_debug_objectives(
+    tmgr: TMgr, variables: Variables
+) -> List[TriggerObject]:
+    """Declares objectives for displaying variable debug information."""
+    display_string = "\n".join(
+        [
+            f"seq0: <{variables.sequences[0].name}>",
+            f"seq1: <{variables.sequences[1].name}>",
+        ]
+    )
+    return [
+        tmgr.add_trigger(
+            "Tetromino Sequence Debug",
+            enabled=False,
+            display_as_objective=True,
+            display_on_screen=True,
+            description=display_string,
+            short_description=display_string,
+            mute_objectives=True,
+        ),
+    ]
+
+
+def _declare_prob_tree(tmgr: TMgr, n: int, pre: str = None) -> ProbTree:
     """
     Adds triggers for generating a random number between 0 and n inclusive.
 
@@ -111,9 +145,9 @@ def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
     """
     # Note there are still some unnecessary triggers for swapping index 0.
     if n < 1:
-        raise ValueError(f'{n} must be positive.')
-    name_prefix = f'{pre} Generate 0--{n}' if pre else f'Generate 0--{n}'
-    name_char = 'a'
+        raise ValueError(f"{n} must be positive.")
+    name_prefix = f"{pre} Generate 0--{n}" if pre else f"Generate 0--{n}"
+    name_char = "a"
 
     def declare_range(left: int, right: int) -> ProbTree:
         """Returns a `ProbTree` for generating numbers in `left:right`."""
@@ -125,24 +159,25 @@ def _declare_prob_tree(tmgr: TMgr, n: int, pre: str=None) -> ProbTree:
         num_right = right - mid
         percent = int(100.0 * round(num_left / total, 2))
         success = tmgr.add_trigger(
-            f'{name_prefix} {name_char} success',
-            enabled=False
+            f"{name_prefix} {name_char} success", enabled=False
         )
         name_char = chr(ord(name_char) + 1)
         failure = tmgr.add_trigger(
-            f'{name_prefix} {name_char} failure',
-            enabled=False
+            f"{name_prefix} {name_char} failure", enabled=False
         )
         name_char = chr(ord(name_char) + 1)
         return BTreeNode(
             ChanceNode(percent, success, failure),
             BTreeNode(left) if num_left == 1 else declare_range(left, mid),
-            BTreeNode(right-1) if num_right == 1 else declare_range(mid, right)
+            BTreeNode(right - 1)
+            if num_right == 1
+            else declare_range(mid, right),
         )
+
     return declare_range(0, n + 1)
 
 
-def _declare_rand_int_triggers(tmgr: TMgr, pre: str=None) -> List[ProbTree]:
+def _declare_rand_int_triggers(tmgr: TMgr, pre: str = None) -> List[ProbTree]:
     """
     Returns a list of Trees for generating random numbers.
 
@@ -150,8 +185,10 @@ def _declare_rand_int_triggers(tmgr: TMgr, pre: str=None) -> List[ProbTree]:
     generating a random number from `0` through `n`, inclusive.
     `pre` is a prefix to prepend to the trigger names.
     """
-    return [_declare_prob_tree(tmgr, n, pre)
-            for n in range(Tetromino.num()-1, 0, -1)]
+    return [
+        _declare_prob_tree(tmgr, n, pre)
+        for n in range(Tetromino.num() - 1, 0, -1)
+    ]
 
 
 def _declare_sequence_init(tmgr: TMgr, pre: str) -> List[ProbTree]:
@@ -164,9 +201,7 @@ def _declare_sequence_init(tmgr: TMgr, pre: str) -> List[ProbTree]:
     return _declare_rand_int_triggers(tmgr, pre)
 
 
-def _declare_selection_triggers(
-        self,
-        tmgr: TMgr) -> Dict[Building, TriggerObject]:
+def _declare_selection_triggers(tmgr: TMgr) -> Dict[Building, TriggerObject]:
     """
     Declares the triggers for selecting buildings.
 
@@ -174,22 +209,71 @@ def _declare_selection_triggers(
     before the input is used in subsequent triggers.
     """
     return {
-        b : tmgr.add_trigger(f'Select {building_names[b]}', enabled=False)
+        b: tmgr.add_trigger(f"Select {building_names[b]}", enabled=False)
         for b in HOTKEY_BUILDINGS.keys()
     }
+
+
+def _declare_move_left(
+    tmgr: TMgr, board: Board, r: int, c: int, t: Tetromino, d: Direction
+) -> Optional[TriggerObject]:
+    """
+    Returns a single move-left trigger if all of the target spaces are
+    in bounds. Otherwise returns `None`.
+    """
+    index = Index(r, c)
+    left_indices = t.indices(d, index)
+    left_adjacent = Index.adjacent_indices(left_indices, Direction.L)
+    for coordinate in left_indices | left_adjacent:
+        if not board.is_in_bounds(coordinate):
+            return None
+    return tmgr.add_trigger(f"Move Left (({r}, {c}), {t} {d})", enabled=False)
+
+
+def _declare_move_left_triggers(tmgr: TMgr, board: Board) -> MoveTriggers:
+    """
+    Returns, for each row, column, Tetromino, and facing of that Tetromino,
+    the two triggers for moving that Tetromino left.
+    """
+    return [
+        [
+            {
+                t: {
+                    d: _declare_move_left(tmgr, board, r, c, t, d)
+                    for d in DIRECTIONS
+                }
+                for t in TETROMINOS
+            }
+            for c in range(board.num_cols)
+        ]
+        # TODO implement for all rows
+        # for r in range(board.num_rows)
+        for r in range(20, 21)
+    ]
 
 
 class TetrisData:
     """
     An instance represents the trigger declarations and units for Tetris.
     """
-    def __init__(self, mmgr: MMgr, tmgr: TMgr, umgr: UMgr, score: ScnVar,
-                 building_x: int, building_y: int,
-                 rows: int, cols: int, space: float):
+
+    def __init__(
+        self,
+        mmgr: MMgr,
+        tmgr: TMgr,
+        umgr: UMgr,
+        variables: Variables,
+        building_x: int,
+        building_y: int,
+        rows: int,
+        cols: int,
+        space: float,
+    ):
         """
         Initializes a `TetrisData` object writing to the input managers.
 
-        `score` is the scenario variables representing a player's score.
+        `variables` are the variables used in the scenario, already added to
+            the trigger manager.
         `building_x` is the x tile coordinate for spawning selection buildings.
         `building_y` is the y tile coordinate for spawning selection buildings.
         """
@@ -200,43 +284,39 @@ class TetrisData:
         for x in range(revealer_len - revlenadj, revealer_len + revlenadj):
             for y in range(revealer_len - revlenadj, revealer_len + revlenadj):
                 umgr.add_unit(
-                    player = Player.ONE,
-                    unit_const=MAP_REVEALER,
-                    x=x,
-                    y=y
+                    player=Player.ONE, unit_const=MAP_REVEALER, x=x, y=y
                 )
 
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(umgr, building_x, building_y)
         self._board = _generate_game_board(mmgr, umgr, rows, cols, space)
 
-        tmgr.add_trigger('-- Init --')
-        self._init_scenario = tmgr.add_trigger('Init Scenario')
+        tmgr.add_trigger("-- Init --", enabled=False)
+        self._init_scenario = tmgr.add_trigger("Init Scenario")
 
-        tmgr.add_trigger('-- Objectives --')
+        tmgr.add_trigger("-- Objectives --", enabled=False)
         self._new_game_objective = _declare_new_game_objective(tmgr)
-        self._score_obj = _declare_score_objective(tmgr, score)
+        self._score_obj = _declare_score_objective(tmgr, variables.score)
+        self._debug_objectives = _declare_debug_objectives(tmgr, variables)
 
-        tmgr.add_trigger('-- Begin Game --')
-        self._begin_game = tmgr.add_trigger('Begin Game')
-        self._seq_init0 = _declare_sequence_init(tmgr, 'Init a')
-        self._init_swap = tmgr.add_trigger('Init Swap', enabled=False)
-        self._seq_init1 = _declare_sequence_init(tmgr, 'Init b')
+        tmgr.add_trigger("-- Begin Game --", enabled=False)
+        self._begin_game = tmgr.add_trigger("Begin Game")
+        self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
+        self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         self._place_init_piece = {
-            t : tmgr.add_trigger(f'Place Initial {t}', enabled=False)
+            t: tmgr.add_trigger(f"Place Initial {t}", enabled=False)
             for t in list(Tetromino)
         }
 
-        tmgr.add_trigger('-- Game Loop --')
+        tmgr.add_trigger("-- Game Loop --")
         self._game_loop = tmgr.add_trigger(
-            'Game Loop', enabled=False, looping=True
+            "Game Loop", enabled=False, looping=True
         )
-        self._selection_triggers = _declare_selection_triggers(
-            self._hotkeys, tmgr
+        self._selection_triggers = _declare_selection_triggers(tmgr)
+        self._move_left_triggers = _declare_move_left_triggers(
+            tmgr, self._board
         )
-        self._move_left = tmgr.add_trigger('Move Left', enabled=False)
-        self._move_right = tmgr.add_trigger('Move Right', enabled=False)
-        self._cleanup = tmgr.add_trigger('Cleanup', enabled=False)
+        self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
 
     @property
     def init_scenario(self) -> TriggerObject:
@@ -252,14 +332,6 @@ class TetrisData:
     def seq_init0(self) -> List[ProbTree]:
         """Returns the first sequence initialization triggers."""
         return self._seq_init0
-
-    @property
-    def swap_init(self) -> TriggerObject:
-        """
-        Returns a trigger for swapping the Tetromino sequences during
-        initialization.
-        """
-        return self._init_swap
 
     @property
     def seq_init1(self) -> List[ProbTree]:
@@ -296,6 +368,11 @@ class TetrisData:
         return self._score_obj
 
     @property
+    def debug_objectives(self) -> List[TriggerObject]:
+        """Returns a list of triggers for debugging variables."""
+        return self._debug_objectives
+
+    @property
     def game_loop(self) -> TriggerObject:
         """Returns a trigger for starting the main game loop."""
         return self._game_loop
@@ -304,6 +381,11 @@ class TetrisData:
     def selection_triggers(self) -> Dict[Building, TriggerObject]:
         """Returns a mapping from a building id to its selection trigger."""
         return self._selection_triggers
+
+    @property
+    def move_left_triggers(self) -> MoveTriggers:
+        """Returns the left and right Tetromino movement triggers."""
+        return self._move_left_triggers
 
     @property
     def cleanup(self) -> TriggerObject:

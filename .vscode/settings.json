@@ -10,6 +10,8 @@
         "btreenode",
         "cata",
         "mmgr",
+        "noqa",
+        "noqu",
         "pseudocode",
         "pvars",
         "scns",
@@ -19,6 +21,7 @@
         "tlst",
         "tmgr",
         "tseq",
-        "umgr"
+        "umgr",
+        "xscalls"
     ]
 }

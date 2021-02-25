@@ -16,10 +16,8 @@ class ChanceNode:
     """
 
     def __init__(
-            self,
-            percent: int,
-            success: TriggerObject,
-            failure: TriggerObject):
+        self, percent: int, success: TriggerObject, failure: TriggerObject
+    ):
         """
         Constructs a new ChanceNode.
 
@@ -32,7 +30,7 @@ class ChanceNode:
             ValueError: If `percent` is not within `0` to `100`, inclusive.
         """
         if percent < 0 or 100 < percent:
-            raise ValueError(f'{percent} must be in `0--100`, inclusive.')
+            raise ValueError(f"{percent} must be in `0--100`, inclusive.")
         self._percent = percent
         self._success = success
         self._failure = failure
@@ -55,4 +53,3 @@ class ChanceNode:
 
 # A binary tree storing `TriggerObject`s or `int`s for generating random `int`s.
 ProbTree = BTreeNode[Union[ChanceNode, int]]
-
