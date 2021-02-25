@@ -13,13 +13,13 @@ from typing import Set
 class Tetromino(Enum):
     """A piece in a game of Tetris."""
 
-    I = 1  # noqa: E741
-    J = 2
-    L = 3
+    I = 5  # noqa: E741
+    J = 7
+    L = 1
     O = 4  # noqa: E741
-    S = 5
+    S = 3
     T = 6
-    Z = 7
+    Z = 2
 
     def __str__(self):
         return _STR[self]

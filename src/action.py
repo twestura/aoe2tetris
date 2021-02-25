@@ -20,3 +20,19 @@ class Action(Enum):
     HARD_DROP = 6
     HOLD = 7
     NEW_GAME = 8
+
+    def __str__(self):
+        return _STRS[self]
+
+
+# Maps each action to its string representation.
+_STRS = {
+    Action.MOVE_LEFT: 'Move Left',
+    Action.MOVE_RIGHT: 'Move Right',
+    Action.ROTATE_CLOCKWISE: 'Rotate Clockwise',
+    Action.ROTATE_COUNTERCLOCKWISE: 'Rotate Counterclockwise',
+    Action.SOFT_DROP: 'Soft Drop',
+    Action.HARD_DROP: 'Hard Drop',
+    Action.HOLD: 'Hold',
+    Action.NEW_GAME: 'New Game',
+}

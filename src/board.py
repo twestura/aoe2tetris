@@ -5,10 +5,10 @@ from AoE2ScenarioParser.datasets.units import Unit
 from AoE2ScenarioParser.objects.unit_obj import UnitObject
 from direction import Direction
 from index import Index
-from typing import Dict
+from typing import Dict, List, Optional
 
 # A tile on the game board.
-Tile = Dict[Direction, Unit]
+Tile = Dict[Direction, UnitObject]
 
 
 class Board:
@@ -24,7 +24,9 @@ class Board:
         """
         self._r = r
         self._c = c
-        self._tiles = [[{} for __ in range(self._c)] for __ in range(self._r)]
+        self._tiles: List[List[Optional[Tile]]] = [
+            [{} for __ in range(self._c)] for __ in range(self._r)
+        ]
 
     @property
     def num_rows(self) -> int:
@@ -36,7 +38,7 @@ class Board:
         """Returns the number of columns in this Tetris board."""
         return self._c
 
-    def __getitem__(self, index: Index) -> Tile:
+    def __getitem__(self, index: Index) -> Optional[Tile]:
         return self._tiles[index.row][index.col]
 
     def is_in_bounds(self, index: Index) -> bool:
@@ -49,7 +51,8 @@ class Board:
         is at that coordinate.
         """
         return self.is_in_bounds(index) and all(
-            u.unit_const == Unit.INVISIBLE_OBJECT for u in self[index].values()
+            self[index] is None or u.unit_const == Unit.INVISIBLE_OBJECT
+            for u in self[index].values()  # type: ignore
         )
 
     def is_filled(self, index: Index) -> bool:
@@ -58,7 +61,8 @@ class Board:
         is at that coordinate.
         """
         return self.is_in_bounds(index) and any(
-            u.unit_const != Unit.INVISIBLE_OBJECT for u in self[index].values()
+            self[index] is not None and u.unit_const != Unit.INVISIBLE_OBJECT
+            for u in self[index].values()  # type: ignore
         )
 
     def is_visible(self, index: Index) -> bool:

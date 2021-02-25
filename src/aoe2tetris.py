@@ -90,8 +90,8 @@ def _impl_init_invisible_object_ownership(tdata: TetrisData):
         source_player=Player.ONE,
         target_player=Player.GAIA,
         selected_object_ids=[
-            tdata.board[Index(r, c)][d].reference_id
-            for r in range(tdata.board.num_rows)
+            tdata.board[Index(r, c)][d].reference_id  # type: ignore
+            for r in range(NUM_VISIBLE, tdata.board.num_rows)
             for c in range(tdata.board.num_cols)
             for d in DIRECTIONS
         ],
@@ -142,7 +142,7 @@ def _impl_place_initial_piece(
         for index in tetromino.indices():
             point = index + center
             if tdata.board.is_visible(point):
-                tile_unit = tdata.board[point][Direction.U]
+                tile_unit = tdata.board[point][Direction.U]  # type: ignore
                 trigger.add_effect(
                     Effect.REPLACE_OBJECT,
                     source_player=Player.GAIA,
@@ -212,98 +212,162 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id)
 
 
-def _impl_move(
+def _impl_move_left(
     variables: Variables,
     tdata: TetrisData,
-    index: Index,
-    t: Tetromino,
-    d: Direction,
+    xs: ScriptCaller,
 ):
-    """Implements the left and right movement for a tile and direction."""
-    left = tdata.move_left_triggers[index.row][index.col][t][d]
-    if left:
-        index = index + Index(20, 0)  # TODO remove hard coded hack
-        left.add_condition(
-            Condition.VARIABLE_VALUE,
-            amount_or_quantity=Action.MOVE_LEFT.value,
-            variable=variables.selected.var_id,
-            comparison=Comparison.EQUAL,
-        )
-        left.add_condition(
-            Condition.VARIABLE_VALUE,
-            amount_or_quantity=index.row,
-            variable=variables.row.var_id,
-            comparison=Comparison.EQUAL,
-        )
-        # left.add_condition(
-        #     Condition.VARIABLE_VALUE,
-        #     amount_or_quantity=index.col,
-        #     variable=variables.col.var_id,
-        #     comparison=Comparison.EQUAL
-        # )
-        # left.add_condition(
-        #     Condition.VARIABLE_VALUE,
-        #     amount_or_quantity=d.value,
-        #     variable=variables.facing.var_id,
-        #     comparison=Comparison.EQUAL
-        # )
-        # TODO be careful indexing by 0, use other variables pointer
-        # left.add_condition(
-        #     Condition.VARIABLE_VALUE,
-        #     amount_or_quantity=t.value,
-        #     variable=variables.tseq[0].var_id,
-        #     comparison=Comparison.EQUAL
-        # )
+    """Implements the left movement trigger."""
+    left = tdata.action_triggers[Action.MOVE_LEFT]
+    left.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_move_left())
+    # The effects:
+    #   * moves the row to the left (script call)
+    #   * clears units of the previous active piece
+    #   * sets units of the new active piece
 
-        left_indices = t.indices(d, index)
-        # left_adjacent = Index.adjacent_indices(left_indices, Direction.L)
-        # for neighbor in left_adjacent:
-        #     for u in tdata.board[neighbor].values():
-        #         left.add_condition(
-        #             Condition.CAPTURE_OBJECT,
-        #             unit_object=u.reference_id,
-        #             source_player=Player.GAIA
-        #         )
+    left.add_effect(
+        Effect.CHANGE_VARIABLE,
+        quantity=1,
+        from_variable=variables.row.var_id,
+        operation=Operation.SUBTRACT,
+    )
 
-        for original_index in left_indices:
-            left.add_effect(
-                Effect.REPLACE_OBJECT,
-                source_player=t.player.value,
-                target_player=Player.GAIA.value,
-                object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
-                selected_object_ids=tdata.board[original_index][d].reference_id,
-            )
-        for original_index in left_indices:
-            new_index = original_index + Direction.L.offset
-            left.add_effect(
-                Effect.REPLACE_OBJECT,
-                source_player=Player.GAIA.value,
-                target_player=t.player.value,
-                object_list_unit_id_2=t.unit,
-                selected_object_ids=tdata.board[new_index][d].reference_id,
-            )
+    # left_indices = t.indices(d, index)
+    # left_adjacent = Index.adjacent_indices(left_indices, Direction.L)
+    # for neighbor in left_adjacent:
+    #     for u in tdata.board[neighbor].values():
+    #         left.add_condition(
+    #             Condition.CAPTURE_OBJECT,
+    #             unit_object=u.reference_id,
+    #             source_player=Player.GAIA
+    #         )
 
-        # Enable and Disable during game loop.
+    # for original_index in left_indices:
+    #     left.add_effect(
+    #         Effect.REPLACE_OBJECT,
+    #         source_player=t.player.value,
+    #         target_player=Player.GAIA.value,
+    #         object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+    #         selected_object_ids=tdata.board[original_index][d].reference_id,
+    #     )
+    # for original_index in left_indices:
+    #     new_index = original_index + Direction.L.offset
+    #     left.add_effect(
+    #         Effect.REPLACE_OBJECT,
+    #         source_player=Player.GAIA.value,
+    #         target_player=t.player.value,
+    #         object_list_unit_id_2=t.unit,
+    #         selected_object_ids=tdata.board[new_index][d].reference_id,
+    #     )
+
+
+def _impl_move_right(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the right movement trigger."""
+    right = tdata.action_triggers[Action.MOVE_RIGHT]
+    right.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_move_right())
+    # TODO implement
+
+
+def _impl_rotate_clockwise(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the clockwise rotation trigger."""
+    clock = tdata.action_triggers[Action.ROTATE_CLOCKWISE]
+    clock.add_condition(
+        Condition.SCRIPT_CALL, xs_function=xs.can_rotate_clockwise()
+    )
+    # TODO implement
+
+
+def _impl_rotate_counterclockwise(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the counterclockwise rotation trigger."""
+    counter = tdata.action_triggers[Action.ROTATE_COUNTERCLOCKWISE]
+    counter.add_condition(
+        Condition.SCRIPT_CALL, xs_function=xs.can_rotate_counterclockwise()
+    )
+    # TODO implement
+
+
+def _impl_soft_drop(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the soft drop trigger."""
+    soft = tdata.action_triggers[Action.SOFT_DROP]
+    soft.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_soft_drop())
+    # TODO implement
+
+
+def _impl_hard_drop(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the hard drop trigger."""
+    hard = tdata.action_triggers[Action.HARD_DROP]
+    hard.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_hard_drop())
+    # TODO implement
+
+
+def _impl_hold(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the hard drop trigger."""
+    hold = tdata.action_triggers[Action.HOLD]
+    hold.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_hold())
+    # TODO implement
+
+
+def _impl_new_game(
+    variables: Variables,
+    tdata: TetrisData,
+    xs: ScriptCaller,
+):
+    """Implements the trigger for starting a new game."""
+    new_game = tdata.action_triggers[Action.NEW_GAME]
+    new_game.add_condition(
+        Condition.VARIABLE_VALUE,
+        amount_or_quantity=Action.NEW_GAME.value,
+        variable=variables.selected.var_id,
+        comparison=Comparison.EQUAL,
+    )
+    # TODO implement
+
+
+def _impl_action_triggers(
+    variables: Variables, tdata: TetrisData, xs: ScriptCaller
+):
+    """Implements the triggers for actions a player may take."""
+    for at in tdata.action_triggers.values():
         tdata.game_loop.add_effect(
-            Effect.ACTIVATE_TRIGGER, trigger_id=left.trigger_id
+            Effect.ACTIVATE_TRIGGER, trigger_id=at.trigger_id
         )
         tdata.cleanup.add_effect(
-            Effect.DEACTIVATE_TRIGGER, trigger_id=left.trigger_id
+            Effect.DEACTIVATE_TRIGGER, trigger_id=at.trigger_id
         )
+    _impl_move_left(variables, tdata, xs)
+    _impl_move_right(variables, tdata, xs)
+    _impl_rotate_clockwise(variables, tdata, xs)
+    _impl_rotate_counterclockwise(variables, tdata, xs)
+    _impl_soft_drop(variables, tdata, xs)
+    _impl_hard_drop(variables, tdata, xs)
+    _impl_hold(variables, tdata, xs)
 
 
-def _impl_move_left_right(variables: Variables, tdata: TetrisData):
-    """Implements moving pieces left and right."""
-    # TODO don't hardcode stuff
-    # for r in range(tdata.board.num_rows):
-    for r in range(20, 21):
-        for c in range(tdata.board.num_cols):
-            for t in TETROMINOS:
-                for d in DIRECTIONS:
-                    _impl_move(variables, tdata, Index(r - 20, c), t, d)
-
-
-def _impl_game_loop(variables: Variables, tdata: TetrisData):
+def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     """Implements the main game loop trigger."""
     tdata.game_loop.add_effect(
         Effect.CHANGE_VARIABLE,
@@ -342,7 +406,7 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData):
                 trigger_id=selection_triggers[j].trigger_id,
             )
 
-    _impl_move_left_right(variables, tdata)
+    _impl_action_triggers(variables, tdata, xs)
 
     tdata._game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
@@ -450,11 +514,11 @@ def _impl_rand_trees(
 
 def impl_triggers(variables: Variables, tdata: TetrisData):
     """Implements triggers using the data initialized in `tdata`."""
-    xsCaller = ScriptCaller(variables)
+    xs = ScriptCaller(variables)
     _impl_init_invisible_object_ownership(tdata)
     _impl_hotkeys(variables, tdata)
-    _impl_begin_game(variables, tdata, xsCaller)
-    _impl_game_loop(variables, tdata)
+    _impl_begin_game(variables, tdata, xs)
+    _impl_game_loop(variables, tdata, xs)
     _impl_objectives(variables, tdata)
 
 

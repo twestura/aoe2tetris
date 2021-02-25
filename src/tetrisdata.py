@@ -2,7 +2,7 @@
 
 
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List
 from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
@@ -10,6 +10,7 @@ from AoE2ScenarioParser.objects.map_obj import MapObject as MMgr
 from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
+from action import Action
 from board import Board
 from btreenode import BTreeNode
 from direction import Direction
@@ -69,14 +70,15 @@ def _generate_game_board(
     #  [sin(theta) cos(theta)]]  [y]]    [x sin(theta) + y cos(theta)]]
 
     board = Board(rows, cols)
-    for r in range(rows):
+    for r in range(rows // 2, rows):
         for c in range(cols):
             x0 = start_x + c * space - center_x
             y0 = start_y + r * space - center_y
             x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
             y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
             for d in DIRECTIONS:
-                board[Index(r, c)][d] = umgr.add_unit(
+                assert board[Index(r, c)] is not None
+                board[Index(r, c)][d] = umgr.add_unit(  # type: ignore
                     player=Player.ONE,
                     unit_const=Unit.INVISIBLE_OBJECT,
                     x=x,
@@ -230,42 +232,9 @@ def _declare_selection_triggers(tmgr: TMgr) -> Dict[Building, TriggerObject]:
     }
 
 
-def _declare_move_left(
-    tmgr: TMgr, board: Board, r: int, c: int, t: Tetromino, d: Direction
-) -> Optional[TriggerObject]:
-    """
-    Returns a single move-left trigger if all of the target spaces are
-    in bounds. Otherwise returns `None`.
-    """
-    index = Index(r, c)
-    left_indices = t.indices(d, index)
-    left_adjacent = Index.adjacent_indices(left_indices, Direction.L)
-    for coordinate in left_indices | left_adjacent:
-        if not board.is_in_bounds(coordinate):
-            return None
-    return tmgr.add_trigger(f"Move Left (({r}, {c}), {t} {d})", enabled=False)
-
-
-def _declare_move_left_triggers(tmgr: TMgr, board: Board) -> MoveTriggers:
-    """
-    Returns, for each row, column, Tetromino, and facing of that Tetromino,
-    the two triggers for moving that Tetromino left.
-    """
-    return [
-        [
-            {
-                t: {
-                    d: _declare_move_left(tmgr, board, r, c, t, d)
-                    for d in DIRECTIONS
-                }
-                for t in TETROMINOS
-            }
-            for c in range(board.num_cols)
-        ]
-        # TODO implement for all rows
-        # for r in range(board.num_rows)
-        for r in range(20, 21)
-    ]
+def _declare_action_triggers(tmgr: TMgr) -> Dict[Action, TriggerObject]:
+    """Returns a dictionary mapping all actions to their triggers."""
+    return {a: tmgr.add_trigger(str(a), enabled=False) for a in set(Action)}
 
 
 class TetrisData:
@@ -329,9 +298,7 @@ class TetrisData:
             "Game Loop", enabled=False, looping=True
         )
         self._selection_triggers = _declare_selection_triggers(tmgr)
-        self._move_left_triggers = _declare_move_left_triggers(
-            tmgr, self._board
-        )
+        self._action_triggers = _declare_action_triggers(tmgr)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
 
     @property
@@ -399,9 +366,9 @@ class TetrisData:
         return self._selection_triggers
 
     @property
-    def move_left_triggers(self) -> MoveTriggers:
-        """Returns the left and right Tetromino movement triggers."""
-        return self._move_left_triggers
+    def action_triggers(self) -> Dict[Action, TriggerObject]:
+        """Returns a dictionary mapping all actions to their triggers."""
+        return self._action_triggers
 
     @property
     def cleanup(self) -> TriggerObject:

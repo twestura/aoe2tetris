@@ -76,3 +76,36 @@ void swapDigits(int id = 0, int i = 0, int j = 0) {
     setDigit(id, i, valj);
     setDigit(id, j, vali);
 }
+
+/// Each `are_emptyn` function returns `true` if all of the tiles are empty.
+///
+/// There are multiple functions to support checking multiple points without
+/// needing to pass array arguments.
+///
+/// Parameters:
+///     `idn`: The id of the variable holding the tile index.
+///     `placen`: The digit place holding the column, in `0..=4`.
+bool are_empty1(int id1 = 0, int place1 = 0) {
+    return (digitEquals(id1, place1, 0));
+}
+bool are_empty2(int id1 = 0, int place1 = 0, int id2 = 0, int place2 = 0) {
+    return (are_empty1(id1, place1) && are_empty1(id2, place2));
+}
+bool are_empty3(
+    int id1 = 0, int place1 = 0,
+    int id2 = 0, int place2 = 0,
+    int id3 = 0, int place3 = 0
+) {
+    return (are_empty2(id1, place1, id2, place2) && are_empty1(id3, place3));
+}
+bool are_empty4(
+    int id1 = 0, int place1 = 0,
+    int id2 = 0, int place2 = 0,
+    int id3 = 0, int place3 = 0,
+    int id4 = 0, int place4 = 0
+) {
+    return (
+        are_empty3(id1, place1, id2, place2, id3, place3)
+            && are_empty1(id4, place4)
+    );
+}

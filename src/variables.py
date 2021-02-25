@@ -14,13 +14,26 @@ NUM_VISIBLE = 20  # The number of visible rows in the Board.
 INIT_ROW = 19  # One row above the first visible row.
 INIT_COL = 4  # Left-center column.
 
+# TODO the parser might break if xs scripts import other xs scripts
+# For now let's just hard-code a bunch of constants to share between here
+# and the xs script file.
+TILE_IDS = [[2 * r + c for c in (0, 1)] for r in range(TETRIS_ROWS)]
+SEQ0_ID = 2 * len(TILE_IDS) + 1
+SEQ1_ID = SEQ0_ID + 1
+SCORE_ID = SEQ1_ID + 1
+ROW_ID = SCORE_ID + 1
+COL_ID = ROW_ID + 1
+FACING_ID = COL_ID + 1
+SEQ_INDEX_ID = FACING_ID + 1
+SELECTED_ID = SEQ_INDEX_ID + 1
+
 
 class ScnVar:
     """An instance represents a variable object and its initial value."""
 
-    def __init__(self, tmgr: TMgr, name: str, init: int):
+    def __init__(self, tmgr: TMgr, name: str, init: int, var_id: int):
         """Initializes a new Variable with the given name and initial value."""
-        self._var = tmgr.add_variable(name)
+        self._var = tmgr.add_variable(name, var_id)
         self._init = init
 
     @property
@@ -52,8 +65,8 @@ def _declare_seq_variables(tmgr: TMgr) -> Tuple[ScnVar, ScnVar]:
     holds the final seven Tetrominos.
     """
     return (
-        ScnVar(tmgr, "seq0", Tetromino.init_seq()),
-        ScnVar(tmgr, "seq1", Tetromino.init_seq()),
+        ScnVar(tmgr, "seq0", Tetromino.init_seq(), SEQ0_ID),
+        ScnVar(tmgr, "seq1", Tetromino.init_seq(), SEQ1_ID),
     )
 
 
@@ -67,8 +80,8 @@ def _declare_board_variables(tmgr: TMgr) -> List[List[ScnVar]]:
     """
     return [
         [
-            ScnVar(tmgr, f"Board[{r}][0..5]", 0),
-            ScnVar(tmgr, f"Board[{r}][5..10]", 0),
+            ScnVar(tmgr, f"Board[{r}][0..5]", 0, TILE_IDS[r][0]),
+            ScnVar(tmgr, f"Board[{r}][5..10]", 0, TILE_IDS[r][1]),
         ]
         for r in range(TETRIS_ROWS)
     ]
@@ -84,13 +97,15 @@ class Variables:
         Parameters:
             tmgr: A scenario's trigger manager.
         """
-        self._score = ScnVar(tmgr, "Score", 0)
-        self._selected = ScnVar(tmgr, "Selected Building", 0)
+        self._score = ScnVar(tmgr, "Score", 0, SCORE_ID)
+        self._selected = ScnVar(tmgr, "Selected Building", 0, SELECTED_ID)
         self._sequences = _declare_seq_variables(tmgr)
-        self._seq_index = ScnVar(tmgr, "Current Tetromino Index", 0)
-        self._facing = ScnVar(tmgr, "Facing", Direction.U.value)
-        self._row = ScnVar(tmgr, "Row Index", INIT_ROW)
-        self._col = ScnVar(tmgr, "Col Index", INIT_COL)
+        self._seq_index = ScnVar(
+            tmgr, "Current Tetromino Index", 0, SEQ_INDEX_ID
+        )
+        self._facing = ScnVar(tmgr, "Facing", Direction.U.value, FACING_ID)
+        self._row = ScnVar(tmgr, "Row Index", INIT_ROW, ROW_ID)
+        self._col = ScnVar(tmgr, "Col Index", INIT_COL, COL_ID)
         self._board_tiles = _declare_board_variables(tmgr)
 
     @property

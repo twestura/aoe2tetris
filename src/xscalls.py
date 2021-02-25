@@ -1,6 +1,7 @@
 """Utilities to implement xs script calls."""
 
 
+from typing import List
 from index import Index
 from variables import Variables
 
@@ -54,7 +55,7 @@ class ScriptCaller:
         self._suffix += 1
         c = Variables.col_variable(index.col)
         var = self._vars.board_tiles[index.row][c]
-        place = c % TETRIS_COLS // 2
+        place = c % (TETRIS_COLS // 2)
         return "\n".join(
             [
                 f"bool _{self._suffix}() " + "{",
@@ -77,7 +78,7 @@ class ScriptCaller:
         self._suffix += 1
         c = Variables.col_variable(index.col)
         var = self._vars.board_tiles[index.row][c]
-        place = c % TETRIS_COLS // 2
+        place = c % (TETRIS_COLS // 2)
         return "\n".join(
             [
                 f"void _{self._suffix}() " + "{",
@@ -124,6 +125,115 @@ class ScriptCaller:
             [
                 f"void _{self._suffix}() " + "{",
                 f"    swapDigits({var_id}, {i}, {j});",
+                "}",
+            ]
+        )
+
+    def are_empty(self, indices: List[Index]) -> str:
+        """
+        Returns a condition string to check if all tiles in `indices` are empty.
+
+        Parameters:
+            `indices`: A list of one to four tiles to check.
+        Raises:
+            `ValueError` if `len(indices)` is not in `1..=4`.
+        """
+        n = len(indices)
+        if n < 1 or n > 4:
+            raise ValueError(f"{n} must be in 1..=4.")
+        self._suffix += 1
+        inputs = []
+        for index in indices:
+            c = Variables.col_variable(index.col)
+            var = self._vars.board_tiles[index.row][c]
+            place = c % (TETRIS_COLS // 2)
+            inputs.append((var.var_id, place))
+        input_arguments = ", ".join(f"{pair[0]}, {pair[1]}" for pair in inputs)
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                f"    areEmpty{n}({input_arguments});",
+                "}",
+            ]
+        )
+
+    def can_move_left(self) -> str:
+        """Returns a condition string to check if a piece can move left."""
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canMoveLeft();",
+                "}",
+            ]
+        )
+
+    def can_move_right(self) -> str:
+        """Returns a condition string to check if a piece can move right."""
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canMoveRight();",
+                "}",
+            ]
+        )
+
+    def can_rotate_clockwise(self) -> str:
+        """
+        Returns a condition string to check if a piece can rotate clockwise.
+        """
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canRotateClockwise();",
+                "}",
+            ]
+        )
+
+    def can_rotate_counterclockwise(self) -> str:
+        """
+        Returns a condition string to check if a piece can rotate clockwise.
+        """
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canRotateCounterclockwise();",
+                "}",
+            ]
+        )
+
+    def can_soft_drop(self) -> str:
+        """Returns a condition string to check if a piece can soft drop."""
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canSoftDrop();",
+                "}",
+            ]
+        )
+
+    def can_hard_drop(self) -> str:
+        """Returns a condition string to check if a piece can hard drop."""
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canHardDrop();",
+                "}",
+            ]
+        )
+
+    def can_hold(self) -> str:
+        """Returns a condition string to check if a piece can hold drop."""
+        self._suffix += 1
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                "    canHold();",
                 "}",
             ]
         )
