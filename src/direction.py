@@ -9,10 +9,10 @@ import index
 class Direction(Enum):
     """Represents the direction in which a Tetromino may face or move."""
 
-    U = 1
-    R = 2
-    D = 3
-    L = 4
+    U = 0
+    R = 1
+    D = 2
+    L = 3
 
     @property
     def facing(self) -> float:

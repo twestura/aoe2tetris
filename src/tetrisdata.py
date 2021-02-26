@@ -2,7 +2,7 @@
 
 
 import math
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
@@ -10,7 +10,6 @@ from AoE2ScenarioParser.objects.map_obj import MapObject as MMgr
 from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
-from action import Action
 from board import Board
 from btreenode import BTreeNode
 from direction import Direction
@@ -18,14 +17,7 @@ from hotkeys import HotkeyBuildings, HOTKEY_BUILDINGS
 from index import Index
 from probtree import ChanceNode, ProbTree
 from tetromino import Tetromino
-from variables import ScnVar, Variables
-
-
-# Type of the move triggers.
-# For each tile in the game board, each piece that can be placed at that tile,
-# and each direction that piece can face, there is a trigger for moving
-# the piece if doing so would keep it on the game board.
-MoveTriggers = List[List[Dict[Tetromino, Dict[Direction, TriggerObject]]]]
+from variables import Variables
 
 
 # Unit constant for a map revealer, which isn't in any of the libraries.
@@ -49,7 +41,7 @@ def _place_invisible_objects(umgr: UMgr):
 
 
 def _generate_game_board(
-    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space: float
+    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, visible: int, space: float
 ) -> Board:
     """
     Places units in the middle of the map to use as the game board.
@@ -69,7 +61,7 @@ def _generate_game_board(
     # [[cos(theta) -sin(theta)] [[x]  = [[x cos(theta) - y sin(theta)]
     #  [sin(theta) cos(theta)]]  [y]]    [x sin(theta) + y cos(theta)]]
 
-    board = Board(rows, cols)
+    board = Board(rows, cols, visible)
     for r in range(rows // 2, rows):
         for c in range(cols):
             x0 = start_x + c * space - center_x
@@ -101,11 +93,17 @@ def _declare_new_game_objective(tmgr: TMgr) -> TriggerObject:
     )
 
 
-def _declare_score_objective(tmgr: TMgr, score_var: ScnVar) -> TriggerObject:
-    """Declares a trigger for the score objective."""
-    display_string = f"Score: <{score_var.name}>"
+def _declare_stat_objective(tmgr: TMgr, variables: Variables) -> TriggerObject:
+    """Declares an objective trigger for displaying score, level, and lines."""
+    display_string = "\n".join(
+        [
+            f"Score: <{variables.score.name}>",
+            f"Level: <{variables.level.name}>",
+            f"Lines: <{variables.lines.name}>",
+        ]
+    )
     return tmgr.add_trigger(
-        "Score Objective",
+        "Stats Objective",
         display_as_objective=True,
         display_on_screen=True,
         description=display_string,
@@ -113,45 +111,6 @@ def _declare_score_objective(tmgr: TMgr, score_var: ScnVar) -> TriggerObject:
         mute_objectives=True,
         enabled=False,
     )
-
-
-def _declare_debug_objectives(
-    tmgr: TMgr, variables: Variables
-) -> List[TriggerObject]:
-    """Declares objectives for displaying variable debug information."""
-    seq_string = "\n".join(
-        [
-            f"seq0: <{variables.sequences[0].name}>",
-            f"seq1: <{variables.sequences[1].name}>",
-        ]
-    )
-    pos_string = "\n".join(
-        [
-            f"row: <{variables.row.name}>",
-            f"col: <{variables.col.name}>",
-            f"facing: <{variables.facing.name}>",
-        ]
-    )
-    return [
-        tmgr.add_trigger(
-            "Tetromino Sequence Debug",
-            enabled=False,
-            display_as_objective=True,
-            display_on_screen=True,
-            description=seq_string,
-            short_description=seq_string,
-            mute_objectives=True,
-        ),
-        tmgr.add_trigger(
-            "Tetromino Position Debug",
-            enabled=False,
-            display_as_objective=True,
-            display_on_screen=True,
-            description=pos_string,
-            short_description=pos_string,
-            mute_objectives=True,
-        ),
-    ]
 
 
 def _declare_prob_tree(tmgr: TMgr, n: int, pre: str = None) -> ProbTree:
@@ -232,9 +191,28 @@ def _declare_selection_triggers(tmgr: TMgr) -> Dict[Building, TriggerObject]:
     }
 
 
-def _declare_action_triggers(tmgr: TMgr) -> Dict[Action, TriggerObject]:
-    """Returns a dictionary mapping all actions to their triggers."""
-    return {a: tmgr.add_trigger(str(a), enabled=False) for a in set(Action)}
+def _declare_render_Triggers(
+    tmgr: TMgr, rows: int, cols: int
+) -> Dict[Tuple[Index, Direction, int], TriggerObject]:
+    """
+    Returns a dictionary mapping state information to a render trigger.
+
+    The state information is a row, column, facing direction, and
+    tetromino. This state indicates the unit to be placed for the game
+    board.
+
+    The trigger replaces the unit if it updated during the current
+    game ticks update stage.
+    """
+    return {
+        (Index(r, c), d, t): tmgr.add_trigger(
+            f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
+        )
+        for r in range(rows // 2, rows)
+        for c in range(cols)
+        for d in list(Direction)
+        for t in range(Tetromino.num() + 1)
+    }
 
 
 class TetrisData:
@@ -252,6 +230,7 @@ class TetrisData:
         building_y: int,
         rows: int,
         cols: int,
+        visible: int,
         space: float,
     ):
         """
@@ -274,32 +253,38 @@ class TetrisData:
 
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(umgr, building_x, building_y)
-        self._board = _generate_game_board(mmgr, umgr, rows, cols, space)
+        self._board = _generate_game_board(
+            mmgr, umgr, rows, cols, visible, space
+        )
 
         tmgr.add_trigger("-- Init --", enabled=False)
         self._init_scenario = tmgr.add_trigger("Init Scenario")
 
         tmgr.add_trigger("-- Objectives --", enabled=False)
         self._new_game_objective = _declare_new_game_objective(tmgr)
-        self._score_obj = _declare_score_objective(tmgr, variables.score)
-        self._debug_objectives = _declare_debug_objectives(tmgr, variables)
+        self._stat_obj = _declare_stat_objective(tmgr, variables)
 
         tmgr.add_trigger("-- Begin Game --", enabled=False)
         self._begin_game = tmgr.add_trigger("Begin Game")
-        self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
-        self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
-        self._place_init_piece = {
-            t: tmgr.add_trigger(f"Place Initial {t}", enabled=False)
-            for t in list(Tetromino)
-        }
+        # self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
+        # self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
+        # self._place_init_piece = {
+        #     t: tmgr.add_trigger(f"Place Initial {t}", enabled=False)
+        #     for t in list(Tetromino)
+        # }
 
         tmgr.add_trigger("-- Game Loop --")
         self._game_loop = tmgr.add_trigger(
             "Game Loop", enabled=False, looping=True
         )
-        self._selection_triggers = _declare_selection_triggers(tmgr)
-        self._action_triggers = _declare_action_triggers(tmgr)
-        self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
+        # self._selection_triggers = _declare_selection_triggers(tmgr)
+        # self._new_game = tmgr.add_trigger("New Game", enabled=False)
+        # self._act = tmgr.add_trigger("Act", enabled=False)
+        # self._render_triggers = _declare_render_Triggers(tmgr, rows, cols)
+        # TODO maybe an init cleanup for a do-while loop so all the
+        # rendering needs to be present only once.
+        # self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
+        self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
 
     @property
     def init_scenario(self) -> TriggerObject:
@@ -311,24 +296,24 @@ class TetrisData:
         """Returns a trigger for an objective to start a new game."""
         return self._new_game_objective
 
-    @property
-    def seq_init0(self) -> List[ProbTree]:
-        """Returns the first sequence initialization triggers."""
-        return self._seq_init0
+    # @property
+    # def seq_init0(self) -> List[ProbTree]:
+    #     """Returns the first sequence initialization triggers."""
+    #     return self._seq_init0
 
-    @property
-    def seq_init1(self) -> List[ProbTree]:
-        """Returns the second sequence initialization triggers."""
-        return self._seq_init1
+    # @property
+    # def seq_init1(self) -> List[ProbTree]:
+    #     """Returns the second sequence initialization triggers."""
+    #     return self._seq_init1
 
-    @property
-    def place_init_piece(self) -> Dict[Tetromino, TriggerObject]:
-        """
-        Returns the triggers for placing a Tetromino at the start.
+    # @property
+    # def place_init_piece(self) -> Dict[Tetromino, TriggerObject]:
+    #     """
+    #     Returns the triggers for placing a Tetromino at the start.
 
-        Maps a Tetromino to the trigger for placing it.
-        """
-        return self._place_init_piece
+    #     Maps a Tetromino to the trigger for placing it.
+    #     """
+    # return self._place_init_piece
 
     @property
     def begin_game(self) -> TriggerObject:
@@ -346,31 +331,54 @@ class TetrisData:
         return self._board
 
     @property
-    def score_objective(self) -> TriggerObject:
+    def stat_objective(self) -> TriggerObject:
         """Returns a trigger for displaying the player's score."""
-        return self._score_obj
-
-    @property
-    def debug_objectives(self) -> List[TriggerObject]:
-        """Returns a list of triggers for debugging variables."""
-        return self._debug_objectives
+        return self._stat_obj
 
     @property
     def game_loop(self) -> TriggerObject:
         """Returns a trigger for starting the main game loop."""
         return self._game_loop
 
-    @property
-    def selection_triggers(self) -> Dict[Building, TriggerObject]:
-        """Returns a mapping from a building id to its selection trigger."""
-        return self._selection_triggers
+    # @property
+    # def selection_triggers(self) -> Dict[Building, TriggerObject]:
+    #     """Returns a mapping from a building id to its selection trigger."""
+    #     return self._selection_triggers
+
+    # @property
+    # def new_game(self) -> TriggerObject:
+    #     """Returns a trigger for starting a new game."""
+    #     return self._new_game
+
+    # @property
+    # def act(self) -> TriggerObject:
+    #     """Returns a trigger for acting on user input and updating state."""
+    #     return self._act
+
+    # def render_triggers(
+    #     self,
+    # ) -> Dict[Tuple[Index, Direction, int], TriggerObject]:
+    #     """
+    #     Returns a dictionary mapping state information to a render trigger.
+
+    #     The state information is a row, column, facing direction, and
+    #     tetromino. This state indicates the unit to be placed for the game
+    #     board.
+
+    #     The trigger replaces the unit if it updated during the current
+    #     game ticks update stage.
+    #     """
+    #     return self._render_triggers
+
+    # @property
+    # def cleanup(self) -> TriggerObject:
+    #     """Returns a trigger for cleanup at the end of every game loop."""
+    #     return self._cleanup
 
     @property
-    def action_triggers(self) -> Dict[Action, TriggerObject]:
-        """Returns a dictionary mapping all actions to their triggers."""
-        return self._action_triggers
-
-    @property
-    def cleanup(self) -> TriggerObject:
-        """Returns a trigger for cleanup at the end of every game loop."""
-        return self._cleanup
+    def begin_game_end(self) -> TriggerObject:
+        """
+        Returns a trigger for ending the begin game phase and starting the
+        game loop.
+        """
+        return self._begin_game_end

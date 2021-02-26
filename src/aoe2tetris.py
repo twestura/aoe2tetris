@@ -75,9 +75,6 @@ PLAYER_TETROMINO = {
 }
 
 
-_XS_MESSAGE_GLOBAL = 0  # Hack to make each xs function have its own name.
-
-
 def output_path() -> str:
     """Returns the output path for the generated scenario file."""
     return os.path.join(OUT_SCN_DIR, f"{OUT_FILENAME}.{SCN_EXT}")
@@ -90,10 +87,9 @@ def _impl_init_invisible_object_ownership(tdata: TetrisData):
         source_player=Player.ONE,
         target_player=Player.GAIA,
         selected_object_ids=[
-            tdata.board[Index(r, c)][d].reference_id  # type: ignore
-            for r in range(NUM_VISIBLE, tdata.board.num_rows)
-            for c in range(tdata.board.num_cols)
-            for d in DIRECTIONS
+            u.reference_id
+            for tile in tdata.board.visible()
+            for u in tile.values()
         ],
     )
 
@@ -139,6 +135,7 @@ def _impl_place_initial_piece(
             from_variable=variables.facing.var_id,
             operation=Operation.SET,
         )
+        # TODO save placing objects for a render phase
         for index in tetromino.indices():
             point = index + center
             if tdata.board.is_visible(point):
@@ -165,6 +162,8 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     * Places the first active piece on the game board.
     """
     t = tdata.begin_game
+    # Initializes game variables.
+    t.add_effect(Effect.SCRIPT_CALL, message=xs.begin_game())
 
     # Handles the hotkey press for starting the game.
     university_id = tdata.hotkeys.building_map[Building.UNIVERSITY].reference_id
@@ -181,154 +180,25 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         target_player=Player.ONE,
         selected_object_ids=university_id,
     )
-
-    init_vars = []
-    init_vars.append(variables.score)
-    for row in variables.board_tiles:
-        for v in row:
-            init_vars.append(v)
-    for v in variables.sequences:
-        init_vars.append(v)
-    init_vars.append(variables.seq_index)
-    for v in init_vars:
-        t.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=v.init,
-            operation=Operation.SET,
-            from_variable=v.var_id,
-        )
-
     t.add_effect(
         Effect.DEACTIVATE_TRIGGER,
         trigger_id=tdata.new_game_objective.trigger_id,
     )
     t.add_effect(
-        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.score_objective.trigger_id
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.stat_objective.trigger_id
     )
-    _impl_rand_trees(0, tdata.seq_init0, t, xs)
-    _impl_rand_trees(1, tdata.seq_init1, t, xs)
-    _impl_place_initial_piece(variables, tdata, xs)
+    # _impl_rand_trees(0, tdata.seq_init0, t, xs)
+    # _impl_rand_trees(1, tdata.seq_init1, t, xs)
+    # _impl_place_initial_piece(variables, tdata, xs)
 
-    t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id)
-
-
-def _impl_move_left(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the left movement trigger."""
-    left = tdata.action_triggers[Action.MOVE_LEFT]
-    left.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_move_left())
-    # The effects:
-    #   * moves the row to the left (script call)
-    #   * clears units of the previous active piece
-    #   * sets units of the new active piece
-
-    left.add_effect(
-        Effect.CHANGE_VARIABLE,
-        quantity=1,
-        from_variable=variables.row.var_id,
-        operation=Operation.SUBTRACT,
+    # t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id)
+    t.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
 
-    # left_indices = t.indices(d, index)
-    # left_adjacent = Index.adjacent_indices(left_indices, Direction.L)
-    # for neighbor in left_adjacent:
-    #     for u in tdata.board[neighbor].values():
-    #         left.add_condition(
-    #             Condition.CAPTURE_OBJECT,
-    #             unit_object=u.reference_id,
-    #             source_player=Player.GAIA
-    #         )
-
-    # for original_index in left_indices:
-    #     left.add_effect(
-    #         Effect.REPLACE_OBJECT,
-    #         source_player=t.player.value,
-    #         target_player=Player.GAIA.value,
-    #         object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
-    #         selected_object_ids=tdata.board[original_index][d].reference_id,
-    #     )
-    # for original_index in left_indices:
-    #     new_index = original_index + Direction.L.offset
-    #     left.add_effect(
-    #         Effect.REPLACE_OBJECT,
-    #         source_player=Player.GAIA.value,
-    #         target_player=t.player.value,
-    #         object_list_unit_id_2=t.unit,
-    #         selected_object_ids=tdata.board[new_index][d].reference_id,
-    #     )
-
-
-def _impl_move_right(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the right movement trigger."""
-    right = tdata.action_triggers[Action.MOVE_RIGHT]
-    right.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_move_right())
-    # TODO implement
-
-
-def _impl_rotate_clockwise(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the clockwise rotation trigger."""
-    clock = tdata.action_triggers[Action.ROTATE_CLOCKWISE]
-    clock.add_condition(
-        Condition.SCRIPT_CALL, xs_function=xs.can_rotate_clockwise()
+    tdata.begin_game_end.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
     )
-    # TODO implement
-
-
-def _impl_rotate_counterclockwise(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the counterclockwise rotation trigger."""
-    counter = tdata.action_triggers[Action.ROTATE_COUNTERCLOCKWISE]
-    counter.add_condition(
-        Condition.SCRIPT_CALL, xs_function=xs.can_rotate_counterclockwise()
-    )
-    # TODO implement
-
-
-def _impl_soft_drop(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the soft drop trigger."""
-    soft = tdata.action_triggers[Action.SOFT_DROP]
-    soft.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_soft_drop())
-    # TODO implement
-
-
-def _impl_hard_drop(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the hard drop trigger."""
-    hard = tdata.action_triggers[Action.HARD_DROP]
-    hard.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_hard_drop())
-    # TODO implement
-
-
-def _impl_hold(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the hard drop trigger."""
-    hold = tdata.action_triggers[Action.HOLD]
-    hold.add_condition(Condition.SCRIPT_CALL, xs_function=xs.can_hold())
-    # TODO implement
 
 
 def _impl_new_game(
@@ -337,7 +207,7 @@ def _impl_new_game(
     xs: ScriptCaller,
 ):
     """Implements the trigger for starting a new game."""
-    new_game = tdata.action_triggers[Action.NEW_GAME]
+    new_game = tdata.new_game
     new_game.add_condition(
         Condition.VARIABLE_VALUE,
         amount_or_quantity=Action.NEW_GAME.value,
@@ -345,26 +215,6 @@ def _impl_new_game(
         comparison=Comparison.EQUAL,
     )
     # TODO implement
-
-
-def _impl_action_triggers(
-    variables: Variables, tdata: TetrisData, xs: ScriptCaller
-):
-    """Implements the triggers for actions a player may take."""
-    for at in tdata.action_triggers.values():
-        tdata.game_loop.add_effect(
-            Effect.ACTIVATE_TRIGGER, trigger_id=at.trigger_id
-        )
-        tdata.cleanup.add_effect(
-            Effect.DEACTIVATE_TRIGGER, trigger_id=at.trigger_id
-        )
-    _impl_move_left(variables, tdata, xs)
-    _impl_move_right(variables, tdata, xs)
-    _impl_rotate_clockwise(variables, tdata, xs)
-    _impl_rotate_counterclockwise(variables, tdata, xs)
-    _impl_soft_drop(variables, tdata, xs)
-    _impl_hard_drop(variables, tdata, xs)
-    _impl_hold(variables, tdata, xs)
 
 
 def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
@@ -399,21 +249,18 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
                 target_player=tar,
                 selected_object_ids=bid,
             )
-    for i in range(len(selection_triggers) - 1):
-        for j in range(i + 1, len(selection_triggers)):
-            selection_triggers[i].add_effect(
-                Effect.DEACTIVATE_TRIGGER,
-                trigger_id=selection_triggers[j].trigger_id,
-            )
+        for t2 in selection_triggers:
+            t.add_effect(Effect.DEACTIVATE_TRIGGER, trigger_id=t2.trigger_id)
 
-    _impl_action_triggers(variables, tdata, xs)
+    # TODO save previous state
+    # TODO act (save the state in a single act function)
 
     tdata._game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
     )
 
 
-def _impl_hotkeys(variables: Variables, tdata: TetrisData):
+def _impl_hotkey_initialization(tdata: TetrisData):
     """
     Implements the building selection hotkeys and variables.
 
@@ -447,11 +294,7 @@ def _impl_hotkeys(variables: Variables, tdata: TetrisData):
 
 def _impl_objectives(variables: Variables, tdata: TetrisData):
     """Implements the triggers to initialize and display player score."""
-    objectives = [
-        tdata.new_game_objective,
-        tdata.score_objective,
-    ] + tdata.debug_objectives
-    for obj in objectives:
+    for obj in (tdata.new_game_objective, tdata.stat_objective):
         obj.add_condition(Condition.PLAYER_DEFEATED, source_player=Player.GAIA)
 
 
@@ -514,12 +357,17 @@ def _impl_rand_trees(
 
 def impl_triggers(variables: Variables, tdata: TetrisData):
     """Implements triggers using the data initialized in `tdata`."""
-    xs = ScriptCaller(variables)
+    xs = ScriptCaller()
+    tdata.init_scenario.add_effect(
+        Effect.SCRIPT_CALL,
+        message=xs.init_xs_array(),
+    )
+    xs.init_xs_array()
     _impl_init_invisible_object_ownership(tdata)
-    _impl_hotkeys(variables, tdata)
-    _impl_begin_game(variables, tdata, xs)
-    _impl_game_loop(variables, tdata, xs)
     _impl_objectives(variables, tdata)
+    _impl_hotkey_initialization(tdata)
+    _impl_begin_game(variables, tdata, xs)
+    # _impl_game_loop(variables, tdata, xs)
 
 
 def build(args):
@@ -537,9 +385,9 @@ def build(args):
     # Use this example scenario for now.
     # Eventually set the player metadata in this code instead of in the editor.
     scn = AoE2Scenario.from_file("src-scns/tetris-base.aoe2scenario")
-    umgr = scn.unit_manager
-    tmgr = scn.trigger_manager
     mmgr = scn.map_manager
+    tmgr = scn.trigger_manager
+    umgr = scn.unit_manager
 
     # Builds the scenario in 2 phases:
     # 1. Define map and player info, place units, and declare triggers.
@@ -554,6 +402,7 @@ def build(args):
         BUILDING_Y,
         TETRIS_ROWS,
         TETRIS_COLS,
+        NUM_VISIBLE,
         SQUARE_SPACE,
     )
     impl_triggers(variables, tdata)
