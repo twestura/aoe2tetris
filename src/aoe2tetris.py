@@ -206,6 +206,29 @@ def _impl_rand_trees(
         _impl_rand_tree(seq_index, tree, xs)
 
 
+def _impl_render_triggers(tdata: TetrisData, xs: ScriptCaller):
+    """
+    Implements the individual tile and direction unit replacement triggers.
+    """
+    for key, render in tdata.render_triggers.items():
+        index, d, t = key
+        render.add_condition(
+            Condition.SCRIPT_CALL,
+            xs_function=xs.can_render_tile(index, d, t),
+        )
+        p = t.player.value if t else Player.GAIA
+        u = t.unit if t else Unit.INVISIBLE_OBJECT
+        tile = tdata.board[index]
+        assert tile is not None
+        unit_object = tile[d]
+        render.add_effect(
+            Effect.REPLACE_OBJECT,
+            target_player=p,
+            object_list_unit_id_2=u,
+            selected_object_ids=[unit_object.reference_id],
+        )
+
+
 def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     """
     Implents the trigger to initialize the game and begin the game loop.
@@ -246,13 +269,19 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     )
     _impl_rand_trees(0, tdata.seq_init0, t, xs)
     _impl_rand_trees(1, tdata.seq_init1, t, xs)
-    # _impl_place_initial_piece(variables, tdata, xs)
 
     t.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
-    # TODO render the initial piece
+    # TODO remove after testing
+    t.add_effect(Effect.SCRIPT_CALL, message=xs.test())
 
+    _impl_render_triggers(tdata, xs)
+    for render in tdata.render_triggers.values():
+        t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id)
+        tdata.begin_game_end.add_effect(
+            Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
+        )
     tdata.begin_game_end.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
     )

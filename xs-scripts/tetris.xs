@@ -274,6 +274,34 @@ void _setBoardValue(
     xsArraySetInt(tileId, d, t);
 }
 
+/// Returns `true` if the board contains the Tetromino `t` at the
+/// indicated tile and direction.
+///
+/// Parameters:
+///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
+///         is initialized.
+///     r: The row index, in `0..TETRIS_ROWS`.
+///     c: The column index, in `0..TETRIS_COLS`.
+///     d: The facing direction, in `0..NUM_DIRS`.
+///     t: The value to compare to.
+bool _tileContains(
+    int boardIndex = 0, int r = 0, int c = 0, int d = 0, int t = 0
+) {
+    return(_getBoardValue(boardIndex, r, c, d) == t);
+}
+
+/// Returns `true` if the board is empty at the indicated tile and direction.
+///
+/// Parameters:
+///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
+///         is initialized.
+///     r: The row index, in `0..TETRIS_ROWS`.
+///     c: The column index, in `0..TETRIS_COLS`.
+///     d: The facing direction, in `0..NUM_DIRS`.
+bool _isTileEmpty(int boardIndex = 0, int r = 0, int c = 0, int d = 0) {
+    return (_tileContains(boardIndex, r, c, d, 0));
+}
+
 /// Clears the board with outer array id `boardId`.
 /// Essentially sets `board[r][c][d] = 0` for all rows, columns, and directions.
 ///
@@ -441,9 +469,27 @@ void update() {
     // TODO implement
 }
 
-/// TODO specify
-bool canRenderTile() {
-    // TODO implement
+/// Returns `true` if the tile at position `(row, col)` facing direction `d`
+/// can be rendered with a Tetromino of shape `t`.
+///
+/// The tile can be rendered if it is filled or the acitive Tetromino the
+/// player is placing is above the tile. The tile is rendered only if the
+/// tile's contents have changed since the previous game state.
+/// That is, if the prev array at this index contains a different value.
+///
+/// Parameters
+///     r: The row index, in `0..TETRIS_ROWS`.
+///     c: The column index, in `0..TETRIS_COLS`.
+///     d: The facing direction, in `0..NUM_DIRS`.
+///     t: The value to set, in `0..=7`.
+bool canRenderTile(int r = 0, int c = 0, int d = 0, int t = 0) {
+    if (_tileContains(PREV_INDEX, r, c, d, t)) {
+        return (false);
+    }
+    if (_tileContains(BOARD_INDEX, r, c, d, t)) {
+        return (true);
+    }
+    // TODO implement active piece check
     return (false);
 }
 
@@ -462,4 +508,16 @@ bool canRenderHold() {
 void test() {
     int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
     _chatArray(seqId);
+    _setBoardValue(BOARD_INDEX, 20, 1, 2, 4);
+    _setBoardValue(BOARD_INDEX, 21, 1, 2, 4);
+    _setBoardValue(BOARD_INDEX, 20, 2, 2, 4);
+    _setBoardValue(BOARD_INDEX, 21, 2, 2, 4);
+    _setBoardValue(BOARD_INDEX, 20, 3, 0, 5);
+    _setBoardValue(BOARD_INDEX, 20, 4, 0, 5);
+    _setBoardValue(BOARD_INDEX, 20, 5, 0, 5);
+    _setBoardValue(BOARD_INDEX, 20, 6, 0, 5);
+    _setBoardValue(BOARD_INDEX, 21, 6, 0, 6);
+    _setBoardValue(BOARD_INDEX, 20, 7, 0, 6);
+    _setBoardValue(BOARD_INDEX, 21, 7, 0, 6);
+    _setBoardValue(BOARD_INDEX, 21, 8, 0, 6);
 }

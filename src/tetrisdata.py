@@ -2,7 +2,7 @@
 
 
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
@@ -193,7 +193,7 @@ def _declare_selection_triggers(tmgr: TMgr) -> Dict[Building, TriggerObject]:
 
 def _declare_render_Triggers(
     tmgr: TMgr, rows: int, cols: int
-) -> Dict[Tuple[Index, Direction, int], TriggerObject]:
+) -> Dict[Tuple[Index, Direction, Optional[Tetromino]], TriggerObject]:
     """
     Returns a dictionary mapping state information to a render trigger.
 
@@ -205,10 +205,11 @@ def _declare_render_Triggers(
     game ticks update stage.
     """
     return {
-        (Index(r, c), d, t): tmgr.add_trigger(
+        (Index(r, c), d, None if t == 0 else Tetromino(t),): tmgr.add_trigger(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
-        for r in range(rows // 2, rows)
+        for r in range(rows // 2, rows // 2 + 3)  # Tests a small number of rows
+        # for r in range(rows // 2, rows)
         for c in range(cols)
         for d in list(Direction)
         for t in range(Tetromino.num() + 1)
@@ -280,7 +281,7 @@ class TetrisData:
         # self._selection_triggers = _declare_selection_triggers(tmgr)
         # self._new_game = tmgr.add_trigger("New Game", enabled=False)
         # self._act = tmgr.add_trigger("Act", enabled=False)
-        # self._render_triggers = _declare_render_Triggers(tmgr, rows, cols)
+        self._render_triggers = _declare_render_Triggers(tmgr, rows, cols)
         # TODO maybe an init cleanup for a do-while loop so all the
         # rendering needs to be present only once.
         # self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
@@ -355,20 +356,21 @@ class TetrisData:
     #     """Returns a trigger for acting on user input and updating state."""
     #     return self._act
 
-    # def render_triggers(
-    #     self,
-    # ) -> Dict[Tuple[Index, Direction, int], TriggerObject]:
-    #     """
-    #     Returns a dictionary mapping state information to a render trigger.
+    @property
+    def render_triggers(
+        self,
+    ) -> Dict[Tuple[Index, Direction, Optional[Tetromino]], TriggerObject]:
+        """
+        Returns a dictionary mapping state information to a render trigger.
 
-    #     The state information is a row, column, facing direction, and
-    #     tetromino. This state indicates the unit to be placed for the game
-    #     board.
+        The state information is a row, column, facing direction, and
+        tetromino. This state indicates the unit to be placed for the game
+        board.
 
-    #     The trigger replaces the unit if it updated during the current
-    #     game ticks update stage.
-    #     """
-    #     return self._render_triggers
+        The trigger replaces the unit if it updated during the current
+        game ticks update stage.
+        """
+        return self._render_triggers
 
     # @property
     # def cleanup(self) -> TriggerObject:

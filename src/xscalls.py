@@ -2,6 +2,9 @@
 
 
 from typing import Optional, Sequence
+from direction import Direction
+from index import Index
+from tetromino import Tetromino
 
 
 SEQ_NUMS = {0, 1}  # The indices of the shuffled Tetromino sequences.
@@ -101,6 +104,27 @@ class ScriptCaller:
             raise ValueError(f"{j} must satisfy 0 <= j <= 6.")
         return self._call_function(
             "swapSeqValues", [str(x) for x in [seq_num, i, j]]
+        )
+
+    def can_render_tile(
+        self, index: Index, facing: Direction, tetromino: Optional[Tetromino]
+    ) -> str:
+        """
+        Returns a condition string for replacing a unit at a board index.
+
+
+        Parameters:
+            index: The row and column index of the tile.
+            d: The facing direction of a piece in the tile.
+            t: The piece in the tile, or `None` if the tile is unoccupied in
+                the given direction.
+        """
+        r = str(index.row)
+        c = str(index.col)
+        d = str(facing.value)
+        t = '0' if tetromino is None else str(tetromino.value)
+        return self._call_function(
+            "canRenderTile", [r, c, d, t]
         )
 
     def test(self) -> str:
