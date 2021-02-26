@@ -4,6 +4,9 @@
 from typing import Optional, Sequence
 
 
+SEQ_NUMS = {0, 1}  # The indices of the shuffled Tetromino sequences.
+
+
 class ScriptCaller:
     """
     An instance manages calls to an xs script.
@@ -61,12 +64,45 @@ class ScriptCaller:
         if not params:
             params = []
         self._suffix += 1
-        return "\n".join([
-            f"void _{self._suffix}() " + "{",
-            f"    {name}({', '.join(params)});",
-            "}",
-        ])
+        return "\n".join(
+            [
+                f"void _{self._suffix}() " + "{",
+                f"    {name}({', '.join(params)});",
+                "}",
+            ]
+        )
 
     def begin_game(self):
-        """"""
+        """
+        Returns a string to call the effect of clearing and initalizing game
+        state.
+        """
         return self._call_function("beginGame")
+
+    def swap_seq_values(self, seq_num: int, i: int, j: int) -> str:
+        """
+        Returns a string to call the effect of swapping two values
+        in the tetromino sequence.
+
+        Parameters:
+            seq_num: Either `0` or `1` to use the sequence of the first 7 or
+                the second 7 Tetrominos.
+            i: The first index to swap.
+            j: The second index to swap.
+        Raises:
+            ValueError if `seq_num` is not `0` or `1` or if either `i` or `j`
+                is not in `0 <= i, j <= 6`.
+        """
+        if seq_num not in SEQ_NUMS:
+            raise ValueError(f"{seq_num} must be 0 or 1.")
+        if i < 0 or i > 6:
+            raise ValueError(f"{i} must satisfy 0 <= i <= 6.")
+        if j < 0 or j > 6:
+            raise ValueError(f"{j} must satisfy 0 <= j <= 6.")
+        return self._call_function(
+            "swapSeqValues", [str(x) for x in [seq_num, i, j]]
+        )
+
+    def test(self) -> str:
+        """Calls a string to call a test xs functions."""
+        return self._call_function("test")

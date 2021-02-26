@@ -30,8 +30,29 @@
 /// preferred to using the id directly.
 const int XS_ARRAY_VAR_ID = 0;
 
+/// The xs-index of the game board array.
+const int BOARD_INDEX = 0;
+
+/// The xs-index of the previous board state.
+const int PREV_INDEX = 1;
+
+/// The xs-index of the active Tetromino's row.
+const int ROW_INDEX = 2;
+
+/// The xs-index of the active Tetromino's col.
+const int COL_INDEX = 3;
+
+/// The xs-index of the active Tetromino's facing direction.
+const int DIR_INDEX = 4;
+
+/// The xs-index of the length 14-Tetromino sequence.
+const int TETROMINO_SEQUENCE_INDEX = 5;
+
+/// The xs-index of the current index of the Tetromino sequence.
+const int TETROMINO_SEQUENCE_INDEX_INDEX = 6;
+
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 2;
+const int NUM_XS_ARRAY_ELEMENTS = 7;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -60,6 +81,16 @@ const int TETRIS_COLS = 10;
 /// The index of the first visible row in a game of Tetris.
 const int VISIBLE = 20;
 
+/// The initial row when a new Tetromino is spawned: one above the highest
+/// visible row.
+const int PLACE_ROW = 19;
+
+/// The initial column when a new Tetromino is spawned: the left-center column.
+const int PLACE_COL = 4;
+
+/// The initial upwards facing direction of a new Tetromino when spawned.
+const int PLACE_DIR = 0;
+
 /// Constants to represent Tetromino shapes.
 /// The same as the enum values assigned in `tetromino.py`.
 const int I = 5;
@@ -70,6 +101,9 @@ const int S = 3;
 const int T = 6;
 const int Z = 2;
 
+/// The number of distinct Tetrominos.
+const int NUM_TETROMINOS = 7;
+
 /// Constants to represent the directions in which Tetrominos can move and face.
 /// The same as the enum values assigned in `direction.py`.
 const int UP = 0;
@@ -79,12 +113,6 @@ const int LEFT = 3;
 
 /// The number of facing directions.
 const int NUM_DIRS = 4;
-
-/// The xs-index of the game board array.
-const int BOARD_INDEX = 0;
-
-/// The xs-index of the previous board state.
-const int PREV_INDEX = 1;
 
 /// Returns the array id of the xs state array.
 int _getXsArrayId() {
@@ -271,6 +299,66 @@ void _clearBoards() {
     _clearBoard(_getState(PREV_INDEX));
 }
 
+/// Initializes the Tetromino Sequence.
+///
+/// Note this funciton does not shuffle the sequences. Shuffling is performed
+/// by the scenario triggers.
+void _initSequence() {
+    // Creates the array and assigns it to the xs-state.
+    int seqId = xsArrayCreateInt(2 * NUM_TETROMINOS, 0, "Tetromion Sequence");
+    _setState(TETROMINO_SEQUENCE_INDEX, seqId);
+    // Assigns initial values to the array.
+    int k = 0;
+    for (k = 0; < NUM_TETROMINOS) {
+        xsArraySetInt(seqId, k, k + 1);
+        xsArraySetInt(seqId, k + NUM_TETROMINOS, k + 1);
+    }
+}
+
+/// Returns the value at `index` of the Tetromino sequence.
+///
+/// Parameters:
+///     index: The index from which to retrieve a value.
+///         Requires `0 <= index < 2 * NUM_TETROMINOS`.
+int _getSequence(int index = 0) {
+    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
+    return (xsArrayGetInt(seqId, index));
+}
+
+/// Returns the value at `index` of the Tetromino sequence to `value`.
+///
+/// Parameters:
+///     index: The index from which to retrieve a value.
+///         Requires `0 <= index < 2 * NUM_TETROMINOS`.
+///     value: The value to assign in the sequence.
+void _setSequence(int index = 0, int value = 0) {
+    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
+    xsArraySetInt(seqId, index, value);
+}
+
+/// Returns the value at the active index of the Tetromino sequence.
+int _currentTetromino() {
+    int k = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
+    return (_getSequence(k));
+}
+
+/// Swaps the values of the Tetromino sequence at the given indices.
+///
+/// Parameter:
+///     seqNum: `0` for the sequence of the first 7 Tetrominos,
+///             `1` for the sequence of the second 7 Tetrominos.
+///     i: An index to swap, in `0..=6`.
+///     j: An index to swap, in `0..=6`.
+void swapSeqValues(int seqNum = 0, int i = 0, int j = 0) {
+    int offset = seqNum * NUM_TETROMINOS;
+    int index0 = offset + i;
+    int index1 = offset + j;
+    int x = _getSequence(index0);
+    int y = _getSequence(index1);
+    _setSequence(index0, y);
+    _setSequence(index1, x);
+}
+
 /// Initializes the array of xs data and stores it's id in the variable
 /// with id `XS_ARRAY_VAR_ID`.
 void initXsArray() {
@@ -278,6 +366,7 @@ void initXsArray() {
     xsSetTriggerVariable(XS_ARRAY_VAR_ID, arrayId);
     _initBoard(BOARD_INDEX);
     _initBoard(PREV_INDEX);
+    _initSequence();
 }
 
 /// Swaps the values stored in variables with ids `id0` and `id1`.
@@ -295,11 +384,19 @@ void _initGameVariables() {
     xsSetTriggerVariable(LINES_ID, LINES_INIT);
 }
 
+/// Initializes the state necessary for placing a Tetromino on the board.
+void _initGamePiece() {
+    _setState(ROW_INDEX, PLACE_ROW);
+    _setState(ROW_INDEX, PLACE_COL);
+    _setState(ROW_INDEX, PLACE_DIR);
+}
+
 /// Initializes the game state for starting a game of Tetris.
 void beginGame() {
     _initGameVariables();
     _clearBoards();
-    // TODO implement
+    _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
+    _initGamePiece();
 }
 
 /// Returns `true` if the move left action is allowed.
@@ -362,8 +459,7 @@ bool canRenderHold() {
     return (false);
 }
 
-/// Function for testing xs scripts.
 void test() {
-    // xsChatData("Hello!", 0);
-    _initBoard();
+    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
+    _chatArray(seqId);
 }

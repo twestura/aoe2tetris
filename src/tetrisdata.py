@@ -266,8 +266,8 @@ class TetrisData:
 
         tmgr.add_trigger("-- Begin Game --", enabled=False)
         self._begin_game = tmgr.add_trigger("Begin Game")
-        # self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
-        # self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
+        self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
+        self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         # self._place_init_piece = {
         #     t: tmgr.add_trigger(f"Place Initial {t}", enabled=False)
         #     for t in list(Tetromino)
@@ -296,15 +296,15 @@ class TetrisData:
         """Returns a trigger for an objective to start a new game."""
         return self._new_game_objective
 
-    # @property
-    # def seq_init0(self) -> List[ProbTree]:
-    #     """Returns the first sequence initialization triggers."""
-    #     return self._seq_init0
+    @property
+    def seq_init0(self) -> List[ProbTree]:
+        """Returns the first sequence initialization triggers."""
+        return self._seq_init0
 
-    # @property
-    # def seq_init1(self) -> List[ProbTree]:
-    #     """Returns the second sequence initialization triggers."""
-    #     return self._seq_init1
+    @property
+    def seq_init1(self) -> List[ProbTree]:
+        """Returns the second sequence initialization triggers."""
+        return self._seq_init1
 
     # @property
     # def place_init_piece(self) -> Dict[Tetromino, TriggerObject]:

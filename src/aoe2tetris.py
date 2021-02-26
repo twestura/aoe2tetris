@@ -149,6 +149,63 @@ def _impl_place_initial_piece(
                 )
 
 
+def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
+    """
+    Implements the triggers for `tree`.
+
+    Requires that `tree` stores `ChanceNode` data (not `int` data).
+    Requires that the root `tree` node's `success` and `failure` triggers
+        are activated by a trigger that occurs in `tmgr`'s trigger list
+        before any of the `success` or `failure` triggers in the tree.
+    """
+    nodes = [tree]  # The internal tree nodes with triggers to implement.
+    while nodes:
+        n = nodes.pop()
+        assert not isinstance(n.data, int)
+        percent = n.data.percent
+        success = n.data.success
+        failure = n.data.failure
+        success.add_condition(Condition.CHANCE, amount_or_quantity=percent)
+        for child, trigger in [(n.left, success), (n.right, failure)]:
+            assert child
+            trigger.add_effect(
+                Effect.DEACTIVATE_TRIGGER, trigger_id=success.trigger_id
+            )
+            if isinstance(child.data, int):
+                # Swaps the contents of the variable at index 0 with that
+                # of the variable at any nonzero index.
+                if child.data != 0:
+                    trigger.add_effect(
+                        Effect.SCRIPT_CALL,
+                        message=xs.swap_seq_values(seq_index, 0, child.data),
+                    )
+            else:
+                nodes.append(child)
+                for t in [child.data.success, child.data.failure]:
+                    trigger.add_effect(
+                        Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
+                    )
+
+
+def _impl_rand_trees(
+    seq_index: int,
+    seq: List[ProbTree],
+    activator: TriggerObject,
+    xs: ScriptCaller,
+):
+    """
+    Implements the random tree triggers used in Fisher Yates.
+
+    seq_index: `0` or `1` to indicate which Tetromino sequence to randomize.
+    """
+    for tree in seq:
+        for t in (tree.data.success, tree.data.failure):
+            activator.add_effect(
+                Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
+            )
+        _impl_rand_tree(seq_index, tree, xs)
+
+
 def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     """
     Implents the trigger to initialize the game and begin the game loop.
@@ -187,14 +244,14 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     t.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.stat_objective.trigger_id
     )
-    # _impl_rand_trees(0, tdata.seq_init0, t, xs)
-    # _impl_rand_trees(1, tdata.seq_init1, t, xs)
+    _impl_rand_trees(0, tdata.seq_init0, t, xs)
+    _impl_rand_trees(1, tdata.seq_init1, t, xs)
     # _impl_place_initial_piece(variables, tdata, xs)
 
-    # t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id)
     t.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
+    # TODO render the initial piece
 
     tdata.begin_game_end.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
@@ -296,63 +353,6 @@ def _impl_objectives(variables: Variables, tdata: TetrisData):
     """Implements the triggers to initialize and display player score."""
     for obj in (tdata.new_game_objective, tdata.stat_objective):
         obj.add_condition(Condition.PLAYER_DEFEATED, source_player=Player.GAIA)
-
-
-def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
-    """
-    Implements the triggers for `tree`.
-
-    Requires that `tree` stores `ChanceNode` data (not `int` data).
-    Requires that the root `tree` node's `success` and `failure` triggers
-        are activated by a trigger that occurs in `tmgr`'s trigger list
-        before any of the `success` or `failure` triggers in the tree.
-    """
-    nodes = [tree]  # The internal tree nodes with triggers to implement.
-    while nodes:
-        n = nodes.pop()
-        assert not isinstance(n.data, int)
-        percent = n.data.percent
-        success = n.data.success
-        failure = n.data.failure
-        success.add_condition(Condition.CHANCE, amount_or_quantity=percent)
-        for child, trigger in [(n.left, success), (n.right, failure)]:
-            assert child
-            trigger.add_effect(
-                Effect.DEACTIVATE_TRIGGER, trigger_id=success.trigger_id
-            )
-            if isinstance(child.data, int):
-                # Swaps the contents of the variable at index 0 with that
-                # of the variable at any nonzero index.
-                if child.data != 0:
-                    trigger.add_effect(
-                        Effect.SCRIPT_CALL,
-                        message=xs.swap_digits(seq_index, 0, child.data),
-                    )
-            else:
-                nodes.append(child)
-                for t in [child.data.success, child.data.failure]:
-                    trigger.add_effect(
-                        Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
-                    )
-
-
-def _impl_rand_trees(
-    seq_index: int,
-    seq: List[ProbTree],
-    activator: TriggerObject,
-    xs: ScriptCaller,
-):
-    """
-    Implements the random tree triggers used in Fisher Yates.
-
-    seq_index: `0` or `1` to indicate which Tetromino sequence to randomize.
-    """
-    for tree in seq:
-        for t in (tree.data.success, tree.data.failure):
-            activator.add_effect(
-                Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
-            )
-        _impl_rand_tree(seq_index, tree, xs)
 
 
 def impl_triggers(variables: Variables, tdata: TetrisData):
