@@ -508,14 +508,14 @@ bool canRenderHold() {
 void test() {
     int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
     _chatArray(seqId);
-    _setBoardValue(BOARD_INDEX, 20, 1, 2, 4);
-    _setBoardValue(BOARD_INDEX, 21, 1, 2, 4);
-    _setBoardValue(BOARD_INDEX, 20, 2, 2, 4);
-    _setBoardValue(BOARD_INDEX, 21, 2, 2, 4);
+    _setBoardValue(BOARD_INDEX, 20, 1, 1, 4);
+    _setBoardValue(BOARD_INDEX, 21, 1, 1, 4);
+    _setBoardValue(BOARD_INDEX, 20, 2, 1, 4);
+    _setBoardValue(BOARD_INDEX, 21, 2, 1, 4);
     _setBoardValue(BOARD_INDEX, 20, 3, 0, 5);
-    _setBoardValue(BOARD_INDEX, 20, 4, 0, 5);
-    _setBoardValue(BOARD_INDEX, 20, 5, 0, 5);
-    _setBoardValue(BOARD_INDEX, 20, 6, 0, 5);
+    _setBoardValue(BOARD_INDEX, 20, 4, 1, 5);
+    _setBoardValue(BOARD_INDEX, 20, 5, 2, 5);
+    _setBoardValue(BOARD_INDEX, 20, 6, 3, 5);
     _setBoardValue(BOARD_INDEX, 21, 6, 0, 6);
     _setBoardValue(BOARD_INDEX, 20, 7, 0, 6);
     _setBoardValue(BOARD_INDEX, 21, 7, 0, 6);

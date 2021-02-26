@@ -34,10 +34,10 @@ class Direction(Enum):
 
 # The radian angle of the direction.
 _ANGLES = {
+    Direction.U: 0.75 * math.pi,
     Direction.R: 0.25 * math.pi,
-    Direction.D: 0.75 * math.pi,
+    Direction.D: 1.75 * math.pi,
     Direction.L: 1.25 * math.pi,
-    Direction.U: 1.75 * math.pi,
 }
 
 

@@ -51,7 +51,6 @@ def _generate_game_board(
     center_x = mmgr.map_width / 2.0 + 0.5
     center_y = mmgr.map_height / 2.0 + 0.5
     # Radians clockwise with 0 towards the northeast (along the x-axis).
-    rotation = 0.75 * math.pi
     theta = 0.25 * math.pi
 
     start_x = center_x - 0.5 * space * (cols - 1)
@@ -75,7 +74,7 @@ def _generate_game_board(
                     unit_const=Unit.INVISIBLE_OBJECT,
                     x=x,
                     y=y,
-                    rotation=rotation,
+                    rotation=d.facing,
                 )
     return board
 
