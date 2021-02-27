@@ -83,6 +83,13 @@ class ScriptCaller:
         """
         return self._call_function("beginGame")
 
+    def begin_game_mid(self):
+        """
+        Returns a string effect message to initialize game state after
+        the sequence shuffling triggers have executed.
+        """
+        return self._call_function("beginGameMid")
+
     def swap_seq_values(self, seq_num: int, i: int, j: int) -> str:
         """
         Returns a string to call the effect of swapping two values

@@ -214,37 +214,27 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
 
     _impl_rand_trees(0, tdata.seq_init0, t, xs)
     _impl_rand_trees(1, tdata.seq_init1, t, xs)
-    # TODO place initial piece
-
-    t.add_effect(
-        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
-    )
 
     _impl_render_triggers(tdata, xs)
+    tdata.begin_game.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_mid.trigger_id
+    )
+    tdata.begin_game_mid.add_effect(
+        Effect.SCRIPT_CALL, message=xs.begin_game_mid()
+    )
     for render in tdata.render_triggers.values():
-        t.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id)
+        tdata.begin_game_mid.add_effect(
+            Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
+        )
         tdata.begin_game_end.add_effect(
             Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
         )
+    tdata.begin_game_mid.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
+    )
     tdata.begin_game_end.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
     )
-
-
-def _impl_new_game(
-    variables: Variables,
-    tdata: TetrisData,
-    xs: ScriptCaller,
-):
-    """Implements the trigger for starting a new game."""
-    pass  # TODO implement
-    # new_game = tdata.new_game
-    # new_game.add_condition(
-    #     Condition.VARIABLE_VALUE,
-    #     amount_or_quantity=Action.NEW_GAME.value,
-    #     variable=variables.selected.var_id,
-    #     comparison=Comparison.EQUAL,
-    # )
 
 
 def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):

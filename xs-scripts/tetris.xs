@@ -33,8 +33,8 @@ const int XS_ARRAY_VAR_ID = 0;
 /// The xs-index of the game board array.
 const int BOARD_INDEX = 0;
 
-/// The xs-index of the previous board state.
-const int PREV_INDEX = 1;
+/// The xs-index of the board state array.
+const int UPDATE_INDEX = 1;
 
 /// The xs-index of the active Tetromino's row.
 const int ROW_INDEX = 2;
@@ -54,20 +54,8 @@ const int TETROMINO_SEQUENCE_INDEX_INDEX = 6;
 /// The xs-index of the selected hotkey and action to perform.
 const int SELECTED_INDEX = 7;
 
-/// The xs-index of the previos row coordinate.
-const int PREV_ROW_INDEX =  8;
-
-/// The xs-index of the previous column coordinate.
-const int PREV_COL_INDEX = 9;
-
-/// The xs-index of the previous facing direction.
-const int PREV_DIR_INDEX = 10;
-
-/// The xs-index of the previous active Tetromino.
-const int PREV_TETROMINO_INDEX = 11;
-
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 12;
+const int NUM_XS_ARRAY_ELEMENTS = 8;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -142,7 +130,6 @@ const int HARD_DROP = 6;
 const int HOLD = 7;
 const int NEW_GAME = 8;
 
-
 /// Returns the array id of the xs state array.
 int _getXsArrayId() {
     return (xsTriggerVariable(XS_ARRAY_VAR_ID));
@@ -191,56 +178,37 @@ void _chatArray(int arrayId = 0) {
     xsChatData(output);
 }
 
-/// Returns the string name of a board based on its index.
-/// `boardName(BOARD_INDEX) == "Board"`
-/// `boardName(PREV_INDEX) == "Prev"`
-///
-/// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`
-string _boardName(int boardIndex = 0) {
-    if (boardIndex == BOARD_INDEX) {
-        return ("Board");
-    } else {
-        return ("Prev");
-    }
-    return ("This line should not be reached.");
-}
-
 /// Initializes an empty tile in a game board row
 //  and returns the tile's array id.
 /// See the specification of `_initBoard`.
+/// is initialized to `false`.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`.
 ///     r: The row index.
 ///     c: The column index.
-int _initBoardTile(int boardIndex = 0, int r = 0, int c = 0) {
-    string name = _boardName(boardIndex);
-    int tileId = xsArrayCreateInt(
-        NUM_DIRS, 0, "Tile " + name + "[" + r + "][" + c + "]"
+int _initBoardTile(int r = 0, int c = 0) {
+    return (
+        xsArrayCreateInt(NUM_DIRS, 0, "Tile board[" + r + "][" + c + "]")
     );
-    return (tileId);
 }
 
 /// Initializes an empty row in a game board and returns the row's array id.
 /// See the specification of `_initBoard`.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`.
 ///     r: The row index.
-int _initBoardRow(int boardIndex = 0, int r = 0) {
-    string name = _boardName(boardIndex);
-    int rowId = xsArrayCreateInt(TETRIS_COLS, 0, name + " Row " + r);
+int _initBoardRow(int r = 0) {
+    int rowId = xsArrayCreateInt(TETRIS_COLS, 0, "Board Row " + r);
     int c = 0;
     for (c = 0; < TETRIS_COLS) {
-        int tileId = _initBoardTile(boardIndex, r, c);
+        int tileId = _initBoardTile(r, c);
         xsArraySetInt(rowId, c, tileId);
     }
     return (rowId);
 }
 
 /// Initializes an empty game board and set the id of this board's array
-/// to the xs-index `boardIndex`.
+/// to the xs-index `BOARD_INDEX`.
 /// A game board consists of nested arrays in order to hold the piece and facing
 /// of every tile in the game.
 ///
@@ -257,47 +225,40 @@ int _initBoardRow(int boardIndex = 0, int r = 0) {
 /// in `1..=7` if there is a Tetromino there.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
+///     boardIndex: Either `BOARD_INDEX` or `UPDATE_INDEX`. Controls which board
 ///         is initialized.
-void _initBoard(int boardIndex = 0) {
-    string name = _boardName(boardIndex);
-    int boardId = xsArrayCreateInt(TETRIS_ROWS, 0, "Outer " + name + " Array");
-    _setState(boardIndex, boardId);
+void _initBoard() {
+    int boardId = xsArrayCreateInt(TETRIS_ROWS, 0, "Outer Board Array");
+    _setState(BOARD_INDEX, boardId);
     int r = 0;
     for (r = 0; < TETRIS_ROWS) {
-        int rowId = _initBoardRow(boardIndex, r);
+        int rowId = _initBoardRow(r);
         xsArraySetInt(boardId, r, rowId);
     }
 }
 
-/// Returns a value from the state board or previous state board.
+/// Returns a value from the state board.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
-///         is initialized.
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
-int _getBoardValue(int boardIndex = 0, int r = 0, int c = 0, int d = 0) {
-    int boardId = _getState(boardIndex);
+int _getBoardValue(int r = 0, int c = 0, int d = 0) {
+    int boardId = _getState(BOARD_INDEX);
     int rowId = xsArrayGetInt(boardId, r);
     int tileId = xsArrayGetInt(rowId, c);
     return (xsArrayGetInt(tileId, d));
 }
 
-/// Sets a value in the state board or previous state board.
+/// Sets a value in the state board.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
-///         is initialized.
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
 ///     t: The value to set, in `0..=7`.
-void _setBoardValue(
-    int boardIndex = 0, int r = 0, int c = 0, int d = 0, int t = 0
-) {
-    int boardId = _getState(boardIndex);
+void _setBoardValue(int r = 0, int c = 0, int d = 0, int t = 0) {
+    int boardId = _getState(BOARD_INDEX);
     int rowId = xsArrayGetInt(boardId, r);
     int tileId = xsArrayGetInt(rowId, c);
     xsArraySetInt(tileId, d, t);
@@ -307,67 +268,178 @@ void _setBoardValue(
 /// indicated tile and direction.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
-///         is initialized.
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
 ///     t: The value to compare to.
-bool _tileContains(
-    int boardIndex = 0, int r = 0, int c = 0, int d = 0, int t = 0
-) {
-    return(_getBoardValue(boardIndex, r, c, d) == t);
+bool _tileContains(int r = 0, int c = 0, int d = 0, int t = 0) {
+    return (_getBoardValue(r, c, d) == t);
 }
 
 /// Returns `true` if the board is empty at the indicated tile and direction.
 ///
 /// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `PREV_INDEX`. Controls which board
-///         is initialized.
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
-bool _isTileEmpty(int boardIndex = 0, int r = 0, int c = 0, int d = 0) {
-    return (_tileContains(boardIndex, r, c, d, 0));
+bool _isTileEmpty(int r = 0, int c = 0, int d = 0) {
+    return (_tileContains(r, c, d, 0));
 }
 
-/// Clears the board with outer array id `boardId`.
+/// Clears the game board.
 /// Essentially sets `board[r][c][d] = 0` for all rows, columns, and directions.
-///
-/// Parameters:
-///    boardId: The outer array id of the board to clear.
-void _clearBoard(int boardId = 0) {
+void _clearBoard() {
     int r = 0;
     for (r = 0; < TETRIS_ROWS) {
         int c = 0;
         for (c = 0; < TETRIS_COLS) {
             int d = 0;
             for (d = 0; < NUM_DIRS) {
-                _setBoardValue(boardId, r, c, d, 0);
+                _setBoardValue(r, c, d, 0);
             }
         }
     }
 }
 
-/// Updates the previous board to have the same state as the current board.
-void _updatePrevBoard() {
+/// Initializes an boolean array for a tile direction in the update array.
+/// See the specification of `_initUpdate`.
+/// The length of the array is one more than the number of Tetrominos, to
+/// account for the invisible object case.
+///
+/// Parameters:
+///     r: The row index.
+///     c: The column index.
+///     d: The direction.
+int _initUpdateDir(int r = 0, int c = 0, int d = 0) {
+    return (
+        xsArrayCreateBool(
+            NUM_TETROMINOS + 1, false, "Update[" + r + "][" + c + "][" + d + "]"
+        )
+    );
+}
+
+/// Initializes an empty tile in the update array and returns the tile's id.
+/// See the specification of `_initUpdate`.
+///
+/// Parameters:
+///     r: The row index.
+///     c: The column index.
+int _initUpdateTile(int r = 0, int c = 0) {
+    int tileId = xsArrayCreateInt(
+        NUM_DIRS, 0, "Tile update[" + r + "][" + c + "]"
+    );
+    int d = 0;
+    for (d = 0; < NUM_DIRS) {
+        int dirId = _initUpdateDir(r, c, d);
+        xsArraySetInt(tileId, d, dirId);
+    }
+    return (tileId);
+}
+
+/// Initializes an empty row in the update array and returns the row's id.
+/// See the specification of `_initUpdate`.
+///
+/// Parameters:
+///     r: The row index.
+int _initUpdateRow(int r = 0) {
+    int rowId = xsArrayCreateInt(TETRIS_COLS, 0, "Update Row " + r);
+    int c = 0;
+    for (c = 0; < TETRIS_COLS) {
+        int tileId = _initUpdateTile(r, c);
+        xsArraySetInt(rowId, c, tileId);
+    }
+    return (rowId);
+}
+
+/// Initializes the game's update array.
+///
+/// The update array is a 4d-array with dimensions for row, column, direction,
+/// and Tetromino.
+///
+/// A value of `true` indicates that the unit at that index must
+/// be re-rendered. The array is set to all `false` at the beginning of each
+/// game loop, and values are set to `true` during the update processing.
+/// When a new game is launched, all entries of `Update` are set to `true`.
+void _initUpdate() {
+    int updateId = xsArrayCreateInt(TETRIS_ROWS, 0, "Outer Update Array");
+    _setState(UPDATE_INDEX, updateId);
+    int r = 0;
+    for (r = 0; < TETRIS_ROWS) {
+        int rowId = _initUpdateRow(r);
+        xsArraySetInt(updateId, r, rowId);
+    }
+}
+
+/// Returns a value from the update array.
+///
+/// Parameters:
+///     r: The row index, in `0..TETRIS_ROWS`.
+///     c: The column index, in `0..TETRIS_COLS`.
+///     d: The facing direction, in `0..NUM_DIRS`.
+///     t: The Tetromino, in `0..=NUM_TETROMINOS`.
+bool _getUpdateValue(int r = 0, int c = 0, int d = 0, int t = 0) {
+    int updateId = _getState(UPDATE_INDEX);
+    int rowId = xsArrayGetInt(updateId, r);
+    int tileId = xsArrayGetInt(rowId, c);
+    int dirId = xsArrayGetInt(tileId, d);
+    return (xsArrayGetBool(dirId, t));
+}
+
+/// Sets a value in the update array.
+///
+/// Parameters:
+///     r: The row index, in `0..TETRIS_ROWS`.
+///     c: The column index, in `0..TETRIS_COLS`.
+///     d: The facing direction, in `0..NUM_DIRS`.
+///     t: The Tetromino, in `0..=NUM_TETROMINOS`.
+///     b: The value to set.
+void _setUpdateValue(
+    int r = 0, int c = 0, int d = 0, int t = 0, bool b = false
+) {
+    int updateId = _getState(UPDATE_INDEX);
+    int rowId = xsArrayGetInt(updateId, r);
+    int tileId = xsArrayGetInt(rowId, c);
+    int dirId = xsArrayGetInt(tileId, d);
+    xsArraySetBool(dirId, t, b);
+}
+
+/// Sets all invisible object renderings to `true` and all other renderings
+/// to `false`.
+void _clearUpdate() {
+    int r = 0;
     for (r = 0; < TETRIS_ROWS) {
         int c = 0;
         for (c = 0; < TETRIS_COLS) {
             int d = 0;
             for (d = 0; < NUM_DIRS) {
-                int currentValue = _getBoardValue(BOARD_INDEX, r, c, d);
-                _setBoardValue(PREV_INDEX, r, c, d, currentValue);
+                _setUpdateValue(r, c, d, 0, true);
+                int t = 1;
+                for (t = 1; < NUM_TETROMINOS + 1) {
+                    _setUpdateValue(r, c, d, t, false);
+                }
             }
         }
     }
 }
 
-/// Sets all tile values to empty in the current and previous boards in order
-/// to clear them before starting a new game.
-void _clearBoards() {
-    _clearBoard(_getState(BOARD_INDEX));
-    _clearBoard(_getState(PREV_INDEX));
+/// Sets all entries of the update array to `b`.
+///
+/// Parameters:
+///     b: The value to set to all entires of the update array.
+void _setAllUpdate(bool b = false) {
+    int r = 0;
+    for (r = 0; < TETRIS_ROWS) {
+        int c = 0;
+        for (c = 0; < TETRIS_COLS) {
+            int d = 0;
+            for (d = 0; < NUM_DIRS) {
+                int t = 0;
+                for (t = 0; < NUM_TETROMINOS + 1) {
+                    _setUpdateValue(r, c, d, t, b);
+                }
+            }
+        }
+    }
 }
 
 /// Initializes the Tetromino Sequence.
@@ -428,32 +500,19 @@ int _activeFacing() {
     return (_getState(DIR_INDEX));
 }
 
-/// Returns the previous game tick's active Tetromino.
-int _prevTetromino() {
-    return (_getState(PREV_TETROMINO_INDEX));
-}
-
-/// Returns the previous game tick's active row coordinate.
-int _prevRow() {
-    return (_getState(PREV_ROW_INDEX));
-}
-
-/// Returns the previous game tick's active column coordinate.
-int _prevCol() {
-    return (_getState(PREV_COL_INDEX));
-}
-
-/// Returns the previous game tick's active facing.
-int _prevFacing() {
-    return (_getState(PREV_DIR_INDEX));
-}
-
-/// Saves the current active state information as the previous state.
-void _saveActiveState() {
-    _setState(PREV_ROW_INDEX, _activeRow());
-    _setState(PREV_COL_INDEX, _activeCol());
-    _setState(PREV_DIR_INDEX, _activeFacing());
-    _setState(PREV_TETROMINO_INDEX, _activeTetromino());
+/// Writes a debug chat message to display position information for the
+/// active Tetromino.
+void _chatPositionInfo() {
+    xsChatData(
+        "Active: ("
+            + _activeRow()
+            + ", "
+            + _activeCol()
+            + ") "
+            + _activeFacing()
+            + " - "
+            + _activeTetromino()
+    );
 }
 
 /// Swaps the values of the Tetromino sequence at the given indices.
@@ -478,8 +537,8 @@ void swapSeqValues(int seqNum = 0, int i = 0, int j = 0) {
 void initXsArray() {
     int arrayId = xsArrayCreateInt(NUM_XS_ARRAY_ELEMENTS, 0, "xs State Array");
     xsSetTriggerVariable(XS_ARRAY_VAR_ID, arrayId);
-    _initBoard(BOARD_INDEX);
-    _initBoard(PREV_INDEX);
+    _initBoard();
+    _initUpdate();
     _initSequence();
 }
 
@@ -498,24 +557,30 @@ void _initGameVariables() {
     xsSetTriggerVariable(LINES_ID, LINES_INIT);
 }
 
-/// Initializes the state necessary for placing a Tetromino on the board.
-/// Requires that the Tetromino sequence arrays are initialized and shuffled.
-void _initGamePiece() {
-    _setState(ROW_INDEX, PLACE_ROW + 1);
-    _setState(COL_INDEX, PLACE_COL);
-    _setState(DIR_INDEX, PLACE_DIR);
-    _setState(PREV_ROW_INDEX, PLACE_ROW);
-    _setState(PREV_COL_INDEX, PLACE_COL);
-    _setState(PREV_DIR_INDEX, PLACE_DIR);
-    _setState(PREV_TETROMINO_INDEX, _activeTetromino());
-}
-
 /// Initializes the game state for starting a game of Tetris.
 void beginGame() {
     _initGameVariables();
-    _clearBoards();
+    _clearBoard();
+    _clearUpdate();
     _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
-    _initGamePiece();
+}
+
+/// Initializes the state necessary for placing a Tetromino on the board.
+/// Requries the update board already is cleared and the Tetromino sequences
+/// are already generated.
+// TODO needs to be called before the render functions...
+void beginGameMid() {
+    /// There is always room to place the starting Tetromino on a new board.
+    /// No need to check if the starting piece and initial drop are legal.
+    _setState(ROW_INDEX, PLACE_ROW + 1);
+    _setState(COL_INDEX, PLACE_COL);
+    _setState(DIR_INDEX, PLACE_DIR);
+    _setUpdateValue(
+        _activeRow(), _activeCol(), _activeFacing(), 0, false
+    );
+    _setUpdateValue(
+        _activeRow(), _activeCol(), _activeFacing(), _activeTetromino(), true
+    );
 }
 
 /// Selects the building corresponding to the `action` hotkey index.
@@ -540,8 +605,7 @@ int _getSelectedBuilding() {
 /// Saves the previous game state.
 void initGameLoop() {
     selectBuilding(0);
-    _saveActiveState();
-    _updatePrevBoard();
+    _setAllUpdate(false);
 }
 
 /// Returns `true` if the selected action is to start a new game.
@@ -566,13 +630,13 @@ bool _canMoveRight() {
 /// Returns `true` if the rotate clockwise action is allowed.
 bool _canRotateClockwise() {
     // TODO handle offsets
-    return (true);
+    return (_getSelectedBuilding() == ROTATE_CLOCKWISE);
 }
 
 /// Returns `true` if the rotate counterclockwise action is allowed.
 bool _canRotateCounterclockwise() {
     // TODO handle offsets
-    return (true);
+    return (_getSelectedBuilding() == ROTATE_COUNTERCLOCKWISE);
 }
 
 /// Returns `true` if the soft drop action is allowed.
@@ -594,68 +658,61 @@ bool _canHold() {
 /// Call in a trigger after storing user input in the `Selected` variable
 /// and before executing the render triggers.
 void update() {
+    // if any entry in the update array is nonempty here, then there's a problem
     // TODO implement
     if (_canMoveLeft()) {
+        _setUpdateValue(
+            _activeRow(), _activeCol(), _activeFacing(), 0, true
+        );
+        _setUpdateValue(
+            _activeRow(),
+            _activeCol() - 1,
+            _activeFacing(),
+            _activeTetromino(),
+            true
+        );
         _setState(COL_INDEX, _activeCol() - 1);
     } else if (_canMoveRight()) {
+        _setUpdateValue(_activeRow(), _activeCol(), _activeFacing(), 0, true);
+        _setUpdateValue(
+            _activeRow(),
+            _activeCol() + 1,
+            _activeFacing(),
+            _activeTetromino(),
+            true
+        );
         _setState(COL_INDEX, _activeCol() + 1);
     } else if (_canRotateClockwise()) {
-        _setState(DIR_INDEX, (_activeFacing() + 1) % NUM_DIRS);
+        int cw = (_activeFacing() + 1) % NUM_DIRS;
+        _setUpdateValue(_activeRow(), _activeCol(), _activeFacing(), 0, true);
+        _setUpdateValue(_activeRow(), _activeCol(), cw, _activeTetromino(), true);
+        _setState(DIR_INDEX, cw);
     } else if (_canRotateCounterclockwise()) {
         // TODO check how `%` works with negative numbers.
-        int d = _activeFacing() - 1;
-        if (d == -1) {
-            d = 3;
+        int ccw = _activeFacing() - 1;
+        if (ccw == -1) {
+            ccw = 3;
         }
-        _setState(DIR_INDEX, d);
+        _setUpdateValue(_activeRow(), _activeCol(), _activeFacing(), 0, true);
+        _setUpdateValue(_activeRow(), _activeCol(), ccw, _activeTetromino(), true);
+        _setState(DIR_INDEX, ccw);
     }
 }
 
-/// Returns `true` if `t` either is on the current game board at
-/// index `(r, c)` facing direction `d`, or the active tetromino is `t`,
-/// is facing direction `d`, and is covering the tile at index `(r, c)`.
-bool _isActive(int r = 0, int c = 0, int d = 0, int t = 0) {
-    return (
-        _tileContains(BOARD_INDEX, r, c, d, t)
-            || (
-                _activeRow() == r
-                    && _activeCol() == c
-                    && _activeFacing() == d
-                    && _activeTetromino() == t
-            )
-    );
-}
-
-/// Returns `true` if `_isActive(r, c, d, t)` was satisfied on the previous
-/// game tick.
-bool _isPrev(int r = 0, int c = 0, int d = 0, int t = 0) {
-    return (
-        _tileContains(PREV_INDEX, r, c, d, t)
-            || (
-                _prevRow() == r
-                    && _prevCol() == c
-                    && _prevFacing() == d
-                    && _prevTetromino() == t
-            )
-    );
-}
 
 /// Returns `true` if the tile at position `(row, col)` facing direction `d`
 /// can be rendered with a Tetromino of shape `t`.
 ///
-/// The tile can be rendered if it is filled or the acitive Tetromino the
-/// player is placing is above the tile. The tile is rendered only if the
-/// tile's contents have changed since the previous game state.
-/// That is, if the prev array at this index contains a different value.
+/// The tile can be rendered if it is updated during the current game tick.
+/// Requires that `update` is already called for the current game tick.
 ///
 /// Parameters
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
-///     t: The value to set, in `0..=7`.
+///     t: The value to render, in `0..=7`.
 bool canRenderTile(int r = 0, int c = 0, int d = 0, int t = 0) {
-    // The ugly `== false` is used because xs scripts do not have bool negation.
-    return (_isActive(r, c, d, t) && (_isPrev(r, c, d, t) == false));
+    return (_getUpdateValue(r, c, d, t));
 }
 
 /// TODO specify

@@ -207,9 +207,12 @@ def _declare_render_Triggers(
         (Index(r, c), d, None if t == 0 else Tetromino(t),): tmgr.add_trigger(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
-        for r in range(rows // 2, rows // 2 + 2)  # Tests a small number of rows
+        for r in range(rows // 2, rows // 2 + 1)  # Tests one row
+        # for r in range(rows // 2, rows // 2 + 2)  # Tests 2 rows
         # for r in range(rows // 2, rows)
+        # for c in range(cols // 2 - 1, cols // 2)  # Tests 1 column
         for c in range(cols)
+        # for d in [Direction.U]  # Tests 1 direction
         for d in list(Direction)
         for t in range(Tetromino.num() + 1)
     }
@@ -266,14 +269,13 @@ class TetrisData:
 
         tmgr.add_trigger("-- Begin Game --", enabled=False)
 
-        self._can_begin_initial = tmgr.add_trigger('Can Begin First Game')
+        self._can_begin_initial = tmgr.add_trigger("Can Begin First Game")
         self._begin_game = tmgr.add_trigger("Begin Game", enabled=False)
         self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
-        # self._place_init_piece = {
-        #     t: tmgr.add_trigger(f"Place Initial {t}", enabled=False)
-        #     for t in list(Tetromino)
-        # }
+        self._begin_game_mid = tmgr.add_trigger(
+            "Begin Game Middle", enabled=False
+        )
 
         tmgr.add_trigger("-- Game Loop --")
         self._game_loop = tmgr.add_trigger(
@@ -342,6 +344,11 @@ class TetrisData:
     def stat_objective(self) -> TriggerObject:
         """Returns a trigger for displaying the player's score."""
         return self._stat_obj
+
+    @property
+    def begin_game_mid(self) -> TriggerObject:
+        """Returns a trigger for updating the render data after shuffling."""
+        return self._begin_game_mid
 
     @property
     def game_loop(self) -> TriggerObject:
