@@ -190,7 +190,7 @@ def _declare_selection_triggers(tmgr: TMgr) -> Dict[Building, TriggerObject]:
     }
 
 
-def _declare_render_Triggers(
+def _declare_render_triggers(
     tmgr: TMgr, rows: int, cols: int
 ) -> Dict[Tuple[Index, Direction, Optional[Tetromino]], TriggerObject]:
     """
@@ -284,7 +284,7 @@ class TetrisData:
         self._selection_triggers = _declare_selection_triggers(tmgr)
         self._new_game = tmgr.add_trigger("New Game", enabled=False)
         self._update = tmgr.add_trigger("Update", enabled=False)
-        self._render_triggers = _declare_render_Triggers(tmgr, rows, cols)
+        self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
 
