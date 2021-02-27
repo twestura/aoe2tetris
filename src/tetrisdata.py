@@ -265,7 +265,9 @@ class TetrisData:
         self._stat_obj = _declare_stat_objective(tmgr, variables)
 
         tmgr.add_trigger("-- Begin Game --", enabled=False)
-        self._begin_game = tmgr.add_trigger("Begin Game")
+
+        self._can_begin_initial = tmgr.add_trigger('Can Begin First Game')
+        self._begin_game = tmgr.add_trigger("Begin Game", enabled=False)
         self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         # self._place_init_piece = {
@@ -312,6 +314,14 @@ class TetrisData:
     #     Maps a Tetromino to the trigger for placing it.
     #     """
     # return self._place_init_piece
+
+    @property
+    def can_begin_initial(self) -> TriggerObject:
+        """
+        Returns a trigger for checking the condition of whether the first game
+        can begin when the scenario initially is loaded.
+        """
+        return self._can_begin_initial
 
     @property
     def begin_game(self) -> TriggerObject:

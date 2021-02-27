@@ -331,7 +331,21 @@ void _clearBoard(int boardId = 0) {
         for (c = 0; < TETRIS_COLS) {
             int d = 0;
             for (d = 0; < NUM_DIRS) {
-                _setBoardValue(boardId, r, c, d);
+                _setBoardValue(boardId, r, c, d, 0);
+            }
+        }
+    }
+}
+
+/// Updates the previous board to have the same state as the current board.
+void _updatePrevBoard() {
+    for (r = 0; < TETRIS_ROWS) {
+        int c = 0;
+        for (c = 0; < TETRIS_COLS) {
+            int d = 0;
+            for (d = 0; < NUM_DIRS) {
+                int currentValue = _getBoardValue(BOARD_INDEX, r, c, d);
+                _setBoardValue(PREV_INDEX, r, c, d, currentValue);
             }
         }
     }
@@ -454,6 +468,12 @@ void selectBuilding(int action = 0) {
     _setState(SELECTED_INDEX, action);
 }
 
+/// Returns the int representing the hotkey action of the
+/// selected building, or `0` if no building is selected.
+int _getSelectedBuilding() {
+    return (_getState(SELECTED_INDEX));
+}
+
 /// Initializes the game state at the start of each game loop.
 ///
 /// Resets the selection variable to be unselected.
@@ -461,7 +481,12 @@ void selectBuilding(int action = 0) {
 void initGameLoop() {
     selectBuilding(0);
     // TODO save the previous piece row, column, and facing as state as well
-    // TODO save the previous game state.
+    _updatePrevBoard();
+}
+
+/// Returns `true` if the selected action is to start a new game.
+bool canStartNewGame() {
+    return (_getSelectedBuilding() == NEW_GAME);
 }
 
 /// Returns `true` if the move left action is allowed.

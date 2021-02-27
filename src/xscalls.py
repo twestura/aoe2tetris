@@ -136,6 +136,10 @@ class ScriptCaller:
         """Returns an effect string to initialize game loop iteration state."""
         return self._call_function("initGameLoop")
 
+    def can_start_new_game(self) -> str:
+        """Returns a condition string to check if a new game can be started."""
+        return self._call_function("canStartNewGame")
+
     def update(self) -> str:
         """Returns a string to call the update game state function."""
         return self._call_function("update")

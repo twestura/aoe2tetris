@@ -184,31 +184,34 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     * Places the first active piece on the game board.
     """
     t = tdata.begin_game
-    # Initializes game variables.
-    t.add_effect(Effect.SCRIPT_CALL, message=xs.begin_game())
-
-    # Handles the hotkey press for starting the game.
+    can = tdata.can_begin_initial
+    # Handles the initial hotkey press for starting the first game.
     university_id = tdata.hotkeys.building_map[Building.UNIVERSITY].reference_id
-    t.add_condition(Condition.OBJECT_SELECTED, unit_object=university_id)
-    t.add_effect(
+    can.add_condition(Condition.OBJECT_SELECTED, unit_object=university_id)
+    can.add_effect(
         Effect.CHANGE_OWNERSHIP,
         source_player=Player.ONE,
         target_player=Player.GAIA,
         selected_object_ids=university_id,
     )
-    t.add_effect(
+    can.add_effect(
         Effect.CHANGE_OWNERSHIP,
         source_player=Player.GAIA,
         target_player=Player.ONE,
         selected_object_ids=university_id,
     )
-    t.add_effect(
+    can.add_effect(
         Effect.DEACTIVATE_TRIGGER,
         trigger_id=tdata.new_game_objective.trigger_id,
     )
-    t.add_effect(
+    can.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.stat_objective.trigger_id
     )
+    can.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id)
+
+    # Initializes game variables.
+    t.add_effect(Effect.SCRIPT_CALL, message=xs.begin_game())
+
     _impl_rand_trees(0, tdata.seq_init0, t, xs)
     _impl_rand_trees(1, tdata.seq_init1, t, xs)
     # TODO place initial piece
@@ -272,18 +275,39 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
                     Effect.DEACTIVATE_TRIGGER, trigger_id=t2.trigger_id
                 )
     tdata.game_loop.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.new_game.trigger_id
+    )
+    tdata.new_game.add_condition(
+        Condition.SCRIPT_CALL, xs_function=xs.can_start_new_game()
+    )
+    tdata.new_game.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game.trigger_id
+    )
+    tdata.new_game.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
+    )
+    tdata.new_game.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.update.trigger_id
+    )
+    tdata.update.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.new_game.trigger_id
+    )
+
+    tdata.game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.update.trigger_id
     )
+    # Update activates the render triggers, that way new game doesn't have to
+    # deactivate them.
     tdata.update.add_effect(Effect.SCRIPT_CALL, message=xs.update())
     for render in tdata.render_triggers.values():
-        tdata.game_loop.add_effect(
+        tdata.update.add_effect(
             Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
         )
         tdata.cleanup.add_effect(
             Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
         )
 
-    tdata.game_loop.add_effect(
+    tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
     )
 
