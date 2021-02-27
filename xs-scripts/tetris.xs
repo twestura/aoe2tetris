@@ -52,10 +52,22 @@ const int TETROMINO_SEQUENCE_INDEX = 5;
 const int TETROMINO_SEQUENCE_INDEX_INDEX = 6;
 
 /// The xs-index of the selected hotkey and action to perform.
-const int SELECTED_INDEX = 0;
+const int SELECTED_INDEX = 7;
+
+/// The xs-index of the previos row coordinate.
+const int PREV_ROW_INDEX =  8;
+
+/// The xs-index of the previous column coordinate.
+const int PREV_COL_INDEX = 9;
+
+/// The xs-index of the previous facing direction.
+const int PREV_DIR_INDEX = 10;
+
+/// The xs-index of the previous active Tetromino.
+const int PREV_TETROMINO_INDEX = 11;
 
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 8;
+const int NUM_XS_ARRAY_ELEMENTS = 12;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -396,9 +408,52 @@ void _setSequence(int index = 0, int value = 0) {
 }
 
 /// Returns the value at the active index of the Tetromino sequence.
-int _currentTetromino() {
+int _activeTetromino() {
     int index = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
     return (_getSequence(index));
+}
+
+/// Returns the row coordinate of the active Tetromino.
+int _activeRow() {
+    return (_getState(ROW_INDEX));
+}
+
+/// Returns the column coordinate of the active Tetromino.
+int _activeCol() {
+    return (_getState(COL_INDEX));
+}
+
+/// Returns the facing direction of the active Tetromino.
+int _activeFacing() {
+    return (_getState(DIR_INDEX));
+}
+
+/// Returns the previous game tick's active Tetromino.
+int _prevTetromino() {
+    return (_getState(PREV_TETROMINO_INDEX));
+}
+
+/// Returns the previous game tick's active row coordinate.
+int _prevRow() {
+    return (_getState(PREV_ROW_INDEX));
+}
+
+/// Returns the previous game tick's active column coordinate.
+int _prevCol() {
+    return (_getState(PREV_COL_INDEX));
+}
+
+/// Returns the previous game tick's active facing.
+int _prevFacing() {
+    return (_getState(PREV_DIR_INDEX));
+}
+
+/// Saves the current active state information as the previous state.
+void _saveActiveState() {
+    _setState(PREV_ROW_INDEX, _activeRow());
+    _setState(PREV_COL_INDEX, _activeCol());
+    _setState(PREV_DIR_INDEX, _activeFacing());
+    _setState(PREV_TETROMINO_INDEX, _activeTetromino());
 }
 
 /// Swaps the values of the Tetromino sequence at the given indices.
@@ -444,10 +499,15 @@ void _initGameVariables() {
 }
 
 /// Initializes the state necessary for placing a Tetromino on the board.
+/// Requires that the Tetromino sequence arrays are initialized and shuffled.
 void _initGamePiece() {
-    _setState(ROW_INDEX, PLACE_ROW);
-    _setState(ROW_INDEX, PLACE_COL);
-    _setState(ROW_INDEX, PLACE_DIR);
+    _setState(ROW_INDEX, PLACE_ROW + 1);
+    _setState(COL_INDEX, PLACE_COL);
+    _setState(DIR_INDEX, PLACE_DIR);
+    _setState(PREV_ROW_INDEX, PLACE_ROW);
+    _setState(PREV_COL_INDEX, PLACE_COL);
+    _setState(PREV_DIR_INDEX, PLACE_DIR);
+    _setState(PREV_TETROMINO_INDEX, _activeTetromino());
 }
 
 /// Initializes the game state for starting a game of Tetris.
@@ -480,7 +540,7 @@ int _getSelectedBuilding() {
 /// Saves the previous game state.
 void initGameLoop() {
     selectBuilding(0);
-    // TODO save the previous piece row, column, and facing as state as well
+    _saveActiveState();
     _updatePrevBoard();
 }
 
@@ -491,35 +551,41 @@ bool canStartNewGame() {
 
 /// Returns `true` if the move left action is allowed.
 bool _canMoveLeft() {
-    return (false);
+    // TODO handle multiple offsets
+    return (_getSelectedBuilding() == MOVE_LEFT && _activeCol() > 0);
 }
 
-/// TODO specify and implement
+/// Returns `true` if the move right action is allowed.
 bool _canMoveRight() {
-    return (false);
+    // TODO handle multiple offsets
+    return (
+        _getSelectedBuilding() == MOVE_RIGHT && _activeCol() < TETRIS_COLS - 1
+    );
 }
 
-/// TODO specify and implement
+/// Returns `true` if the rotate clockwise action is allowed.
 bool _canRotateClockwise() {
-    return (false);
+    // TODO handle offsets
+    return (true);
 }
 
-/// TODO specify and implement
+/// Returns `true` if the rotate counterclockwise action is allowed.
 bool _canRotateCounterclockwise() {
-    return (false);
+    // TODO handle offsets
+    return (true);
 }
 
-/// TODO specify and implement
+/// Returns `true` if the soft drop action is allowed.
 bool _canSoftDrop() {
     return (false);
 }
 
-/// TODO specify and implement
+/// Returns `true` if the hard drop action is allowed.
 bool _canHardDrop() {
     return (false);
 }
 
-/// TODO specify and implement
+/// Returns `true` if the hold action is allowed.
 bool _canHold() {
     return (false);
 }
@@ -529,6 +595,49 @@ bool _canHold() {
 /// and before executing the render triggers.
 void update() {
     // TODO implement
+    if (_canMoveLeft()) {
+        _setState(COL_INDEX, _activeCol() - 1);
+    } else if (_canMoveRight()) {
+        _setState(COL_INDEX, _activeCol() + 1);
+    } else if (_canRotateClockwise()) {
+        _setState(DIR_INDEX, (_activeFacing() + 1) % NUM_DIRS);
+    } else if (_canRotateCounterclockwise()) {
+        // TODO check how `%` works with negative numbers.
+        int d = _activeFacing() - 1;
+        if (d == -1) {
+            d = 3;
+        }
+        _setState(DIR_INDEX, d);
+    }
+}
+
+/// Returns `true` if `t` either is on the current game board at
+/// index `(r, c)` facing direction `d`, or the active tetromino is `t`,
+/// is facing direction `d`, and is covering the tile at index `(r, c)`.
+bool _isActive(int r = 0, int c = 0, int d = 0, int t = 0) {
+    return (
+        _tileContains(BOARD_INDEX, r, c, d, t)
+            || (
+                _activeRow() == r
+                    && _activeCol() == c
+                    && _activeFacing() == d
+                    && _activeTetromino() == t
+            )
+    );
+}
+
+/// Returns `true` if `_isActive(r, c, d, t)` was satisfied on the previous
+/// game tick.
+bool _isPrev(int r = 0, int c = 0, int d = 0, int t = 0) {
+    return (
+        _tileContains(PREV_INDEX, r, c, d, t)
+            || (
+                _prevRow() == r
+                    && _prevCol() == c
+                    && _prevFacing() == d
+                    && _prevTetromino() == t
+            )
+    );
 }
 
 /// Returns `true` if the tile at position `(row, col)` facing direction `d`
@@ -545,14 +654,8 @@ void update() {
 ///     d: The facing direction, in `0..NUM_DIRS`.
 ///     t: The value to set, in `0..=7`.
 bool canRenderTile(int r = 0, int c = 0, int d = 0, int t = 0) {
-    if (_tileContains(PREV_INDEX, r, c, d, t)) {
-        return (false);
-    }
-    if (_tileContains(BOARD_INDEX, r, c, d, t)) {
-        return (true);
-    }
-    // TODO implement active piece check
-    return (false);
+    // The ugly `== false` is used because xs scripts do not have bool negation.
+    return (_isActive(r, c, d, t) && (_isPrev(r, c, d, t) == false));
 }
 
 /// TODO specify
