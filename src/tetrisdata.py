@@ -207,7 +207,7 @@ def _declare_render_Triggers(
         (Index(r, c), d, None if t == 0 else Tetromino(t),): tmgr.add_trigger(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
-        for r in range(rows // 2, rows // 2 + 3)  # Tests a small number of rows
+        for r in range(rows // 2, rows // 2 + 2)  # Tests a small number of rows
         # for r in range(rows // 2, rows)
         for c in range(cols)
         for d in list(Direction)
@@ -277,13 +277,11 @@ class TetrisData:
         self._game_loop = tmgr.add_trigger(
             "Game Loop", enabled=False, looping=True
         )
-        # self._selection_triggers = _declare_selection_triggers(tmgr)
-        # self._new_game = tmgr.add_trigger("New Game", enabled=False)
-        # self._act = tmgr.add_trigger("Act", enabled=False)
+        self._selection_triggers = _declare_selection_triggers(tmgr)
+        self._new_game = tmgr.add_trigger("New Game", enabled=False)
+        self._update = tmgr.add_trigger("Update", enabled=False)
         self._render_triggers = _declare_render_Triggers(tmgr, rows, cols)
-        # TODO maybe an init cleanup for a do-while loop so all the
-        # rendering needs to be present only once.
-        # self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
+        self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
 
     @property
@@ -340,20 +338,20 @@ class TetrisData:
         """Returns a trigger for starting the main game loop."""
         return self._game_loop
 
-    # @property
-    # def selection_triggers(self) -> Dict[Building, TriggerObject]:
-    #     """Returns a mapping from a building id to its selection trigger."""
-    #     return self._selection_triggers
+    @property
+    def selection_triggers(self) -> Dict[Building, TriggerObject]:
+        """Returns a mapping from a building id to its selection trigger."""
+        return self._selection_triggers
 
-    # @property
-    # def new_game(self) -> TriggerObject:
-    #     """Returns a trigger for starting a new game."""
-    #     return self._new_game
+    @property
+    def new_game(self) -> TriggerObject:
+        """Returns a trigger for starting a new game."""
+        return self._new_game
 
-    # @property
-    # def act(self) -> TriggerObject:
-    #     """Returns a trigger for acting on user input and updating state."""
-    #     return self._act
+    @property
+    def update(self) -> TriggerObject:
+        """Returns a trigger for acting on user input and updating state."""
+        return self._update
 
     @property
     def render_triggers(
@@ -371,10 +369,10 @@ class TetrisData:
         """
         return self._render_triggers
 
-    # @property
-    # def cleanup(self) -> TriggerObject:
-    #     """Returns a trigger for cleanup at the end of every game loop."""
-    #     return self._cleanup
+    @property
+    def cleanup(self) -> TriggerObject:
+        """Returns a trigger for cleanup at the end of every game loop."""
+        return self._cleanup
 
     @property
     def begin_game_end(self) -> TriggerObject:

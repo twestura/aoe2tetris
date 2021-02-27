@@ -13,17 +13,14 @@ from AoE2ScenarioParser.datasets.conditions import Condition
 from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.trigger_lists import (
-    Comparison,
     ObjectAttribute,
     Operation,
 )
 from AoE2ScenarioParser.datasets.units import Unit
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
-from action import Action
 from typing import List
 from direction import Direction
 from hotkeys import HOTKEY_BUILDINGS
-from index import Index
 from probtree import ProbTree
 from tetrisdata import TetrisData
 from tetromino import Tetromino
@@ -92,61 +89,6 @@ def _impl_init_invisible_object_ownership(tdata: TetrisData):
             for u in tile.values()
         ],
     )
-
-
-def _impl_place_initial_piece(
-    variables: Variables, tdata: TetrisData, xs: ScriptCaller
-):
-    """
-    Implements placing the initial piece on the game board.
-
-    Required: the Tetromino sequences are randomized.
-    """
-    for tetromino, trigger in tdata.place_init_piece.items():
-        tdata.begin_game.add_effect(
-            Effect.ACTIVATE_TRIGGER, trigger_id=trigger.trigger_id
-        )
-        trigger.add_condition(
-            Condition.SCRIPT_CALL,
-            xs_function=xs.seq_value_equals(0, tetromino.value),
-        )
-        for t in list(Tetromino):
-            if t != tetromino:
-                trigger.add_effect(
-                    Effect.DEACTIVATE_TRIGGER,
-                    trigger_id=tdata.place_init_piece[t].trigger_id,
-                )
-        center = Index(INIT_ROW + 1, INIT_COL)
-        trigger.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=center.row,
-            from_variable=variables.row.var_id,
-            operation=Operation.SET,
-        )
-        trigger.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=center.col,
-            from_variable=variables.col.var_id,
-            operation=Operation.SET,
-        )
-        trigger.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=Direction.U.value,
-            from_variable=variables.facing.var_id,
-            operation=Operation.SET,
-        )
-        # TODO save placing objects for a render phase
-        for index in tetromino.indices():
-            point = index + center
-            if tdata.board.is_visible(point):
-                tile_unit = tdata.board[point][Direction.U]  # type: ignore
-                trigger.add_effect(
-                    Effect.REPLACE_OBJECT,
-                    source_player=Player.GAIA,
-                    target_player=tetromino.player,
-                    selected_object_ids=tile_unit.reference_id,
-                    object_list_unit_id_2=tetromino.unit,
-                )
 
 
 def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
@@ -269,12 +211,11 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     )
     _impl_rand_trees(0, tdata.seq_init0, t, xs)
     _impl_rand_trees(1, tdata.seq_init1, t, xs)
+    # TODO place initial piece
 
     t.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
-    # TODO remove after testing
-    t.add_effect(Effect.SCRIPT_CALL, message=xs.test())
 
     _impl_render_triggers(tdata, xs)
     for render in tdata.render_triggers.values():
@@ -293,40 +234,30 @@ def _impl_new_game(
     xs: ScriptCaller,
 ):
     """Implements the trigger for starting a new game."""
-    new_game = tdata.new_game
-    new_game.add_condition(
-        Condition.VARIABLE_VALUE,
-        amount_or_quantity=Action.NEW_GAME.value,
-        variable=variables.selected.var_id,
-        comparison=Comparison.EQUAL,
-    )
-    # TODO implement
+    pass  # TODO implement
+    # new_game = tdata.new_game
+    # new_game.add_condition(
+    #     Condition.VARIABLE_VALUE,
+    #     amount_or_quantity=Action.NEW_GAME.value,
+    #     variable=variables.selected.var_id,
+    #     comparison=Comparison.EQUAL,
+    # )
 
 
 def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     """Implements the main game loop trigger."""
-    tdata.game_loop.add_effect(
-        Effect.CHANGE_VARIABLE,
-        quantity=0,
-        operation=Operation.SET,
-        from_variable=variables.selected.var_id,
-    )
-
+    tdata.game_loop.add_effect(Effect.SCRIPT_CALL, message=xs.init_game_loop())
     selection_triggers = list(tdata.selection_triggers.values())
     for t in selection_triggers:
         tdata.game_loop.add_effect(
             Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
         )
-
-    # Building Selected
     for b, t in tdata.selection_triggers.items():
         bid = tdata.hotkeys.building_map[b].reference_id
         t.add_condition(Condition.OBJECT_SELECTED, unit_object=bid)
         t.add_effect(
-            Effect.CHANGE_VARIABLE,
-            quantity=HOTKEY_BUILDINGS[b].value,
-            operation=Operation.SET,
-            from_variable=variables.selected.var_id,
+            Effect.SCRIPT_CALL,
+            message=xs.select_building(HOTKEY_BUILDINGS[b]),
         )
         for src, tar in [(Player.ONE, Player.GAIA), (Player.GAIA, Player.ONE)]:
             t.add_effect(
@@ -336,12 +267,23 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
                 selected_object_ids=bid,
             )
         for t2 in selection_triggers:
-            t.add_effect(Effect.DEACTIVATE_TRIGGER, trigger_id=t2.trigger_id)
+            if t != t2:
+                t.add_effect(
+                    Effect.DEACTIVATE_TRIGGER, trigger_id=t2.trigger_id
+                )
+    tdata.game_loop.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.update.trigger_id
+    )
+    tdata.update.add_effect(Effect.SCRIPT_CALL, message=xs.update())
+    for render in tdata.render_triggers.values():
+        tdata.game_loop.add_effect(
+            Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
+        )
+        tdata.cleanup.add_effect(
+            Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
+        )
 
-    # TODO save previous state
-    # TODO act (save the state in a single act function)
-
-    tdata._game_loop.add_effect(
+    tdata.game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
     )
 
@@ -396,7 +338,7 @@ def impl_triggers(variables: Variables, tdata: TetrisData):
     _impl_objectives(variables, tdata)
     _impl_hotkey_initialization(tdata)
     _impl_begin_game(variables, tdata, xs)
-    # _impl_game_loop(variables, tdata, xs)
+    _impl_game_loop(variables, tdata, xs)
 
 
 def build(args):

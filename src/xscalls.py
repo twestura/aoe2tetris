@@ -2,6 +2,7 @@
 
 
 from typing import Optional, Sequence
+from action import Action
 from direction import Direction
 from index import Index
 from tetromino import Tetromino
@@ -122,10 +123,22 @@ class ScriptCaller:
         r = str(index.row)
         c = str(index.col)
         d = str(facing.value)
-        t = '0' if tetromino is None else str(tetromino.value)
+        t = "0" if tetromino is None else str(tetromino.value)
+        return self._call_function("canRenderTile", [r, c, d, t])
+
+    def select_building(self, action: Optional[Action] = None) -> str:
+        """Returns an effect string for setting the selected building."""
         return self._call_function(
-            "canRenderTile", [r, c, d, t]
+            "selectBuilding", ["0" if action is None else str(action.value)]
         )
+
+    def init_game_loop(self) -> str:
+        """Returns an effect string to initialize game loop iteration state."""
+        return self._call_function("initGameLoop")
+
+    def update(self) -> str:
+        """Returns a string to call the update game state function."""
+        return self._call_function("update")
 
     def test(self) -> str:
         """Calls a string to call a test xs functions."""

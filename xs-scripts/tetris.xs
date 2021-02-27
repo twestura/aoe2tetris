@@ -51,8 +51,11 @@ const int TETROMINO_SEQUENCE_INDEX = 5;
 /// The xs-index of the current index of the Tetromino sequence.
 const int TETROMINO_SEQUENCE_INDEX_INDEX = 6;
 
+/// The xs-index of the selected hotkey and action to perform.
+const int SELECTED_INDEX = 0;
+
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 7;
+const int NUM_XS_ARRAY_ELEMENTS = 8;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -113,6 +116,20 @@ const int LEFT = 3;
 
 /// The number of facing directions.
 const int NUM_DIRS = 4;
+
+/// Constants to represent game actions triggered by users pressing hotkeys to
+/// select buildings.
+/// The same as the enum values assigned in `action.py`.
+const int NO_ACTION = 0;
+const int MOVE_LEFT = 1;
+const int MOVE_RIGHT = 2;
+const int ROTATE_CLOCKWISE = 3;
+const int ROTATE_COUNTERCLOCKWISE = 4;
+const int SOFT_DROP = 5;
+const int HARD_DROP = 6;
+const int HOLD = 7;
+const int NEW_GAME = 8;
+
 
 /// Returns the array id of the xs state array.
 int _getXsArrayId() {
@@ -366,8 +383,8 @@ void _setSequence(int index = 0, int value = 0) {
 
 /// Returns the value at the active index of the Tetromino sequence.
 int _currentTetromino() {
-    int k = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
-    return (_getSequence(k));
+    int index = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
+    return (_getSequence(index));
 }
 
 /// Swaps the values of the Tetromino sequence at the given indices.
@@ -425,6 +442,26 @@ void beginGame() {
     _clearBoards();
     _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
     _initGamePiece();
+}
+
+/// Selects the building corresponding to the `action` hotkey index.
+///
+/// Parameters:
+///     action: The hotkey number for the action.
+///         Action numbers are the same as those in `action.py`.
+///         Requires `action` is in `0..=8`.
+void selectBuilding(int action = 0) {
+    _setState(SELECTED_INDEX, action);
+}
+
+/// Initializes the game state at the start of each game loop.
+///
+/// Resets the selection variable to be unselected.
+/// Saves the previous game state.
+void initGameLoop() {
+    selectBuilding(0);
+    // TODO save the previous piece row, column, and facing as state as well
+    // TODO save the previous game state.
 }
 
 /// Returns `true` if the move left action is allowed.
@@ -505,19 +542,20 @@ bool canRenderHold() {
     return (false);
 }
 
+/// Scratch test function.
 void test() {
-    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
-    _chatArray(seqId);
-    _setBoardValue(BOARD_INDEX, 20, 1, 1, 4);
-    _setBoardValue(BOARD_INDEX, 21, 1, 1, 4);
-    _setBoardValue(BOARD_INDEX, 20, 2, 1, 4);
-    _setBoardValue(BOARD_INDEX, 21, 2, 1, 4);
-    _setBoardValue(BOARD_INDEX, 20, 3, 0, 5);
-    _setBoardValue(BOARD_INDEX, 20, 4, 1, 5);
-    _setBoardValue(BOARD_INDEX, 20, 5, 2, 5);
-    _setBoardValue(BOARD_INDEX, 20, 6, 3, 5);
-    _setBoardValue(BOARD_INDEX, 21, 6, 0, 6);
-    _setBoardValue(BOARD_INDEX, 20, 7, 0, 6);
-    _setBoardValue(BOARD_INDEX, 21, 7, 0, 6);
-    _setBoardValue(BOARD_INDEX, 21, 8, 0, 6);
+    // int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
+    // _chatArray(seqId);
+    // _setBoardValue(BOARD_INDEX, 20, 1, 1, 4);
+    // _setBoardValue(BOARD_INDEX, 21, 1, 1, 4);
+    // _setBoardValue(BOARD_INDEX, 20, 2, 1, 4);
+    // _setBoardValue(BOARD_INDEX, 21, 2, 1, 4);
+    // _setBoardValue(BOARD_INDEX, 20, 3, 0, 5);
+    // _setBoardValue(BOARD_INDEX, 20, 4, 1, 5);
+    // _setBoardValue(BOARD_INDEX, 20, 5, 2, 5);
+    // _setBoardValue(BOARD_INDEX, 20, 6, 3, 5);
+    // _setBoardValue(BOARD_INDEX, 21, 6, 0, 6);
+    // _setBoardValue(BOARD_INDEX, 20, 7, 0, 6);
+    // _setBoardValue(BOARD_INDEX, 21, 7, 0, 6);
+    // _setBoardValue(BOARD_INDEX, 21, 8, 0, 6);
 }
