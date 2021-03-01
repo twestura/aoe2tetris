@@ -52,7 +52,7 @@ The hotkeys and their actions are described in the following table and topic par
 | Action                     | Hotkey                     | Value |
 | -------------------------- | -------------------------- | ----- |
 | Move Left                  | Select All Archery Ranges  | 1     |
-| Move Right                 | Select All Barracks        | 2     |
+| Move Right                 | Select All Blacksmiths     | 2     |
 | Rotate Clockwise           | Select All Stables         | 3     |
 | Rotate Counterclockwise    | Select All Kreposts        | 4     |
 | Soft Drop                  | Select All Monasteries     | 5     |

@@ -21,13 +21,7 @@ class ScriptCaller:
     """
 
     def __init__(self):
-        """
-        Initializes a new script caller.
-
-        Parameters:
-            variables: The scenario variables with which the script calls
-                can interact.
-        """
+        """Initializes a new script caller."""
         self._suffix = -1  # Increments at the start of every method.
 
     def init_xs_array(self):

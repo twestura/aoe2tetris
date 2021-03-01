@@ -207,9 +207,9 @@ def _declare_render_triggers(
         (Index(r, c), d, None if t == 0 else Tetromino(t),): tmgr.add_trigger(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
-        for r in range(rows // 2, rows // 2 + 1)  # Tests one row
-        # for r in range(rows // 2, rows // 2 + 2)  # Tests 2 rows
-        # for r in range(rows // 2, rows)
+        # for r in range(rows // 2, rows // 2 + 1)  # Tests one row
+        # for r in range(rows // 2, rows // 2 + 3)  # Tests 3 rows
+        for r in range(rows // 2, rows)
         # for c in range(cols // 2 - 1, cols // 2)  # Tests 1 column
         for c in range(cols)
         # for d in [Direction.U]  # Tests 1 direction
