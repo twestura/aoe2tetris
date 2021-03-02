@@ -76,7 +76,8 @@ const int SCORE_INIT = 0;
 const int LEVEL_ID = 2;
 /// The initial level.
 
-const int LEVEL_INIT = 0;
+/// The initial starting level without clearing any rows.
+const int LEVEL_INIT = 1;
 
 /// The id of the variable that holds the number of cleared lines.
 const int LINES_ID = 3;
@@ -149,6 +150,14 @@ const int PLACE_DIR = UP;
 /// The number of rotation tests for all Tetrominos other than `O`.
 const int NUM_ROTATION_TESTS = 5;
 
+/// For every Soft Drop, the player's score increases by
+/// the player's current level multiplied by `SOFT_DROP_MULTIPLIER`.
+const int SOFT_DROP_MULTIPLIER = 1;
+
+/// For every line passed in a Hard Drop, the player's score increases by
+/// the player's current level multiplied by `HARD_DROP_MULTIPLIER`.
+const int HARD_DROP_MULTIPLIER = 2;
+
 /// Writes a chat message containing the values of the array.
 ///
 /// Parameters:
@@ -201,7 +210,7 @@ void _chatVectorArray(int arrayId = 0) {
 Vector _rotateCW(Vector v = Vector(0.0, 0.0, 0.0)) {
     float r = xsVectorGetX(v);
     float c = xsVectorGetY(v);
-    return (xsVectorSet(c, 0.0 -r, 0.0));
+    return (xsVectorSet(c, 0.0 - r, 0.0));
 }
 
 /// Returns a `Vector` with the first two coordinates of `v` rotated
@@ -393,14 +402,18 @@ bool _tileContains(int r = 0, int c = 0, int d = 0, int t = 0) {
     return (_getBoardValue(r, c, d) == t);
 }
 
-/// Returns `true` if the board is empty at the indicated tile and direction.
+/// Returns `true` if the board is empty at the indicated tile.
 ///
 /// Parameters:
 ///     r: The row index, in `0..TETRIS_ROWS`.
 ///     c: The column index, in `0..TETRIS_COLS`.
-///     d: The facing direction, in `0..NUM_DIRS`.
-bool _isTileEmpty(int r = 0, int c = 0, int d = 0) {
-    return (_tileContains(r, c, d, 0));
+bool _isTileEmpty(int r = 0, int c = 0) {
+    for (d = 0; < NUM_DIRS) {
+        if (_tileContains(r, c, d, 0) == false) {
+            return (false);
+        }
+    }
+    return (true);
 }
 
 /// Returns `true` if the row and column coordinate `(r, c)` is in bounds
@@ -409,12 +422,11 @@ bool _isTileEmpty(int r = 0, int c = 0, int d = 0) {
 /// Parameters:
 ///     r: The row index to check.
 ///     c: The column index to check.
-///     d: The facing direction, in `0..NUM_DIRS`.
-bool _isInBoundsAndEmpty(int r = 0, int c = 0, int d = 0) {
+bool _isInBoundsAndEmpty(int r = 0, int c = 0,) {
     if (r < 0 || r >= TETRIS_ROWS || c < 0 || c >= TETRIS_COLS) {
         return (false);
     }
-    return (_isTileEmpty(r, c, d));
+    return (_isTileEmpty(r, c));
 }
 
 /// Clears the game board.
@@ -982,7 +994,7 @@ bool _testOneRotation(int arrayId = 0, int d = 0, int t = 0) {
         Vector v2 = _rotateVector(v, d);
         int r = xsVectorGetX(v2) + row + dr;
         int c = xsVectorGetY(v2) + col + dc;
-        if (_isInBoundsAndEmpty(r, c, d) == false) {
+        if (_isInBoundsAndEmpty(r, c) == false) {
             return (false);
         }
     }
@@ -1119,7 +1131,7 @@ bool _canTranslate(int dr = 0, int dc = 0) {
         Vector v2 = _rotateVector(v, d);
         int r = xsVectorGetX(v2) + row + dr;
         int c = xsVectorGetY(v2) + col + dc;
-        if (_isInBoundsAndEmpty(r, c, d) == false) {
+        if (_isInBoundsAndEmpty(r, c) == false) {
             return (false);
         }
     }
@@ -1189,7 +1201,6 @@ void _translatePosition(int dr  = 0, int dc = 0) {
         int col = _activeCol();
         int d = _activeFacing();
         int t = _activeTetromino();
-        // TODO use new facing directions
         // Sets the currently active tiles to be rendered as Invisible Objects.
         for (k0 = 0; < NUM_TILES) {
             Vector v = xsArrayGetVector(offsetArrayId, k0);
@@ -1258,6 +1269,37 @@ void _rotatePosition(int r = 0) {
     _setState(DIR_INDEX, newDir);
 }
 
+/// Returns `true` if the active `Tetromino` can drop into row `r`.
+/// Requires `r > _activeRow()` and for all `r' in _activeRow()..r`,
+/// `_canDrop(r') == true`.
+bool _canDrop(int r = 0) {
+    int offsetsId = _getOffsets(_activeTetromino());
+    int d = _activeFacing();
+    // row of its indices.
+    int dr = r - _activeRow();
+    for (k = 0; < NUM_TILES) {
+        Vector vUp = xsArrayGetVector(offsetsId, k);
+        Vector v = _rotateVector(vUp, d);
+        int row = _activeRow() + xsVectorGetX(v) + dr;
+        int col = _activeCol() + xsVectorGetY(v);
+        if (_isInBoundsAndEmpty(row, col) == false) {
+            return (false);
+        }
+    }
+    return (true);
+}
+
+/// Returns the number of rows beneath the active Tetromino that have an opening
+/// into which the Tetromino may drop.
+int _numDropRows() {
+    int r = _activeRow() + 1;
+    // The active Tetrmino can drop its center to all rows in `_activeRow()..r`.
+    while (_canDrop(r)) {
+        r++;
+    }
+    return (r - 1 - _activeRow());
+}
+
 /// Updates the game state.
 /// Call in a trigger after storing user input in the `Selected` variable
 /// and before executing the render triggers.
@@ -1272,8 +1314,64 @@ void update() {
         _rotatePosition(COUNTERCLOCKWISE);
     } else if (_canSoftDrop()) {
         _translatePosition(1, 0);
+        int scoreSoft = xsTriggerVariable(SCORE_ID);
+        int levelSoft = xsTriggerVariable(LEVEL_ID);
+        xsSetTriggerVariable(
+            SCORE_ID, scoreSoft + SOFT_DROP_MULTIPLIER * levelSoft
+        );
     } else if (_canHardDrop()) {
+        int numRows = _numDropRows();
+        int scoreHard = xsTriggerVariable(SCORE_ID);
+        int levelHard = xsTriggerVariable(LEVEL_ID);
+        xsSetTriggerVariable(
+            SCORE_ID, scoreHard + HARD_DROP_MULTIPLIER * levelHard * numRows
+        );
+
+        // Drops the Tetromino.
+        int offsetsId = _getOffsets(_activeTetromino());
+        for (k0 = 0; < NUM_TILES) {
+            Vector v0 = xsArrayGetVector(offsetsId, k0);
+            Vector v0Rotated = _rotateVector(v0, _activeFacing());
+            int r0 = xsVectorGetX(v0Rotated) + _activeRow();
+            int c0 = xsVectorGetY(v0Rotated) + _activeCol();
+            _setUpdateValue(r0, c0, _activeFacing(), 0, true);
+        }
+        for (k1 = 0; < NUM_TILES) {
+            Vector v1 = xsArrayGetVector(offsetsId, k1);
+            Vector v1Rotated = _rotateVector(v1, _activeFacing());
+            int r1 = xsVectorGetX(v1Rotated) + _activeRow() + numRows;
+            int c1 = xsVectorGetY(v1Rotated) + _activeCol();
+            _setUpdateValue(r1, c1, _activeFacing(), 0, false);
+            _setUpdateValue(r1, c1, _activeFacing(), _activeTetromino(), true);
+            _setBoardValue(r1, c1, _activeFacing(), _activeTetromino());
+        }
+        _setState(ROW_INDEX, _activeRow() + numRows);
+
+
+        // clear lines and update the score
         // TODO implement
+
+        // Spawns a new Tetromino
+        int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
+        if (seqIndex == NUM_TETROMINOS - 1) {
+            // TODO generate new sequence... this requires more triggers
+        } else {
+            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, seqIndex + 1);
+            _setState(ROW_INDEX, PLACE_ROW);
+            _setState(COL_INDEX, PLACE_COL);
+            _setState(DIR_INDEX, PLACE_DIR);
+            // TODO check for defeat, then move Tetromino down if not defeated.
+            _setState(ROW_INDEX, PLACE_ROW + 1);
+            int offsetsId2 = _getOffsets(_activeTetromino());
+            for (k2 = 0; < NUM_TILES) {
+                Vector v2 = xsArrayGetVector(offsetsId2, k2);
+                int r2 = xsVectorGetX(v2) + _activeRow();
+                int c2 = xsVectorGetY(v2) + _activeCol();
+                _setUpdateValue(
+                    r2, c2, _activeFacing(), _activeTetromino(), true
+                );
+            }
+        }
     } else if (_canHold()) {
         // TODO implement
     }
