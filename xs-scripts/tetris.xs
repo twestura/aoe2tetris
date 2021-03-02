@@ -57,8 +57,14 @@ const int SELECTED_INDEX = 7;
 /// The xs-index of the Tetromino offset arrays.
 const int TETROMINO_OFFSETS_INDEX = 8;
 
+/// The xs-index of the I Tetromino rotation offsets.
+const int ROTATE_I_INDEX = 9;
+
+/// The xs-index of the J, L, S, T, and Z Tetromino rotation offsets.
+const int ROTATE_X_INDEX = 10;
+
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 9;
+const int NUM_XS_ARRAY_ELEMENTS = 11;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -113,6 +119,10 @@ const int LEFT = 3;
 /// The number of facing directions.
 const int NUM_DIRS = 4;
 
+/// Constants to represent the directions in which Tetrominos can rotate.
+const int CLOCKWISE = 0;
+const int COUNTERCLOCKWISE = 1;
+
 /// Constants to represent game actions triggered by users pressing hotkeys to
 /// select buildings.
 /// The same as the enum values assigned in `action.py`.
@@ -136,10 +146,13 @@ const int PLACE_COL = 4;
 /// The initial upwards facing direction of a new Tetromino when spawned.
 const int PLACE_DIR = UP;
 
+/// The number of rotation tests for all Tetrominos other than `O`.
+const int NUM_ROTATION_TESTS = 5;
+
 /// Writes a chat message containing the values of the array.
 ///
 /// Parameters:
-///     arrayId: The id of the array to print.
+///     arrayId: The id of the array to chat.
 void _chatArray(int arrayId = 0) {
     string output = "[";
     string delim = "";
@@ -160,6 +173,88 @@ string _vecStr(Vector v = Vector(0.0, 0.0, 0.0)) {
     float y = xsVectorGetY(v);
     float z = xsVectorGetZ(v);
     return ("(" + x + ", " + y + ", " + z + ")");
+}
+
+/// Writes a chat message containing the values of the array of Vectors.
+///
+/// Parameters:
+///     arrayId: The id of the array to chat.
+void _chatVectorArray(int arrayId = 0) {
+    string output = "[";
+    string delim = "";
+    int n = xsArrayGetSize(arrayId);
+    for (k = 0; < n) {
+        output = output + delim + _vecStr(xsArrayGetVector(arrayId, k));
+        delim = ", ";
+    }
+    output = output + "]";
+    xsChatData("Array ID: %d", arrayId);
+    xsChatData("Array Length: %d", n);
+    xsChatData(output);
+}
+
+/// Returns a `Vector` with the first two coordinates of `v` rotated
+/// 90 degrees clockwise.
+///
+/// Parameters:
+///     v: The `Vector` to rotate.
+Vector _rotateCW(Vector v = Vector(0.0, 0.0, 0.0)) {
+    float r = xsVectorGetX(v);
+    float c = xsVectorGetY(v);
+    return (xsVectorSet(c, 0.0 -r, 0.0));
+}
+
+/// Returns a `Vector` with the first two coordinates of `v` rotated
+/// 90 degrees counterclockwise.
+///
+/// Parameters:
+///     v: The `Vector` to rotate.
+Vector _rotateCCW(Vector v = Vector(0.0, 0.0, 0.0)) {
+    float r = xsVectorGetX(v);
+    float c = xsVectorGetY(v);
+    return (xsVectorSet(0.0 - c, r, 0.0));
+}
+
+/// Returns a `Vector` rotate to turn from facing `UP` to facing direction `d`.
+///
+/// Parameters:
+///     v: The `Vector` to rotate.
+///     d: The target direction.
+Vector _rotateVector(Vector v = Vector(0.0, 0.0, 0.0), int d = 0) {
+    if (d == RIGHT) {
+        return (_rotateCW(v));
+    }
+    if (d == DOWN) {
+        return (_rotateCW(_rotateCW(v)));
+    }
+    if (d == LEFT) {
+        return (_rotateCCW(v));
+    }
+    return (v);
+}
+
+/// Roturns the number of clockwise 90 degree turns a unit takes to rotate.
+///
+/// ```
+/// _rotationDelta(CLOCKWISE) == 1
+/// _rotationDelta(COUNTERCLOCKWISE) == 3
+/// ```
+///
+/// Parameters:
+///     r: The rotation direction. One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
+int _rotationDelta(int r = 0) {
+    if (r == CLOCKWISE) {
+        return (1);
+    }
+    return (3);
+}
+
+/// Returns the direction `d` rotated in direction `r`.
+/// Parameters:
+///     d: The facing direction, in `0..=3`.
+///     r: The rotation direction. One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
+int _rotateDirection(int d = 0, int r = 0) {
+    return ((d + _rotationDelta(r)) % NUM_DIRS);
 }
 
 // =============================================================================
@@ -191,6 +286,11 @@ void _setState(int index = 0, int value = 0) {
     int arrayId = _getXsArrayId();
     xsArraySetInt(arrayId, index, value);
 
+}
+
+/// Chats the xs state array.
+void _chatStateArray() {
+    _chatArray(_getXsArrayId());
 }
 
 // =============================================================================
@@ -301,6 +401,20 @@ bool _tileContains(int r = 0, int c = 0, int d = 0, int t = 0) {
 ///     d: The facing direction, in `0..NUM_DIRS`.
 bool _isTileEmpty(int r = 0, int c = 0, int d = 0) {
     return (_tileContains(r, c, d, 0));
+}
+
+/// Returns `true` if the row and column coordinate `(r, c)` is in bounds
+/// and the board tile at coordinate `(r, c)` in direction `d` is empty.
+///
+/// Parameters:
+///     r: The row index to check.
+///     c: The column index to check.
+///     d: The facing direction, in `0..NUM_DIRS`.
+bool _isInBoundsAndEmpty(int r = 0, int c = 0, int d = 0) {
+    if (r < 0 || r >= TETRIS_ROWS || c < 0 || c >= TETRIS_COLS) {
+        return (false);
+    }
+    return (_isTileEmpty(r, c, d));
 }
 
 /// Clears the game board.
@@ -459,7 +573,7 @@ void _setAllUpdate(bool b = false) {
 /// by the scenario triggers.
 void _initSequence() {
     // Creates the array and assigns it to the xs-state.
-    int seqId = xsArrayCreateInt(2 * NUM_TETROMINOS, 0, "Tetromion Sequence");
+    int seqId = xsArrayCreateInt(2 * NUM_TETROMINOS, 0, "Tetromino Sequence");
     _setState(TETROMINO_SEQUENCE_INDEX, seqId);
     // Assigns initial values to the array.
     for (k = 0; < NUM_TETROMINOS) {
@@ -536,13 +650,13 @@ int _activeFacing() {
 void _chatPositionInfo() {
     xsChatData(
         "Active: ("
-            + _activeRow()
-            + ", "
-            + _activeCol()
-            + ") "
-            + _activeFacing()
-            + " - "
-            + _activeTetromino()
+        + _activeRow()
+        + ", "
+        + _activeCol()
+        + ") "
+        + _activeFacing()
+        + " - "
+        + _activeTetromino()
     );
 }
 
@@ -635,6 +749,266 @@ void chatOffsetArrays() {
 }
 
 // =============================================================================
+// Rotation Offsets
+// =============================================================================
+
+/// Initializes the rotation array for the I Tetromino.
+void _initRotationI() {
+    int rotationHeader = xsArrayCreateInt(NUM_DIRS, 0, "Rotate I Offsets");
+    _setState(ROTATE_I_INDEX, rotationHeader);
+
+    int arrayU = xsArrayCreateInt(2, 0, "Rotate I Up");
+    xsArraySetInt(rotationHeader, UP, arrayU);
+    // UCW
+    int arrayUCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Up CW"
+    );
+    xsArraySetInt(arrayU, CLOCKWISE, arrayUCW);
+    xsArraySetVector(arrayUCW, 0, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayUCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCW, 2, Vector(0.0, 2.0, 0.0));
+    xsArraySetVector(arrayUCW, 3, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCW, 4, Vector(-2.0, 2.0, 0.0));
+    // UCCW
+    int arrayUCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Up CCW"
+    );
+    xsArraySetInt(arrayU, COUNTERCLOCKWISE, arrayUCCW);
+    xsArraySetVector(arrayUCCW, 0, Vector(1.0, 0.0, 0.0));
+    xsArraySetVector(arrayUCCW, 1, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCCW, 2, Vector(1.0, 2.0, 0.0));
+    xsArraySetVector(arrayUCCW, 3, Vector(-1.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCCW, 4, Vector(2.0, 2.0, 0.0));
+
+    int arrayR = xsArrayCreateInt(2, 0, "Rotate I Right");
+    xsArraySetInt(rotationHeader, RIGHT, arrayR);
+    // RCW
+    int arrayRCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Right CW"
+    );
+    xsArraySetInt(arrayR, CLOCKWISE, arrayRCW);
+    xsArraySetVector(arrayRCW, 0, Vector(1.0, 0.0, 0.0));
+    xsArraySetVector(arrayRCW, 1, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayRCW, 2, Vector(1.0, 2.0, 0.0));
+    xsArraySetVector(arrayRCW, 3, Vector(-1.0, -1.0, 0.0));
+    xsArraySetVector(arrayRCW, 4, Vector(2.0, 2.0, 0.0));
+    // RCCW
+    int arrayRCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Right CCW"
+    );
+    xsArraySetInt(arrayR, COUNTERCLOCKWISE, arrayRCCW);
+    xsArraySetVector(arrayRCCW, 0, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayRCCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCCW, 2, Vector(0.0, -2.0, 0.0));
+    xsArraySetVector(arrayRCCW, 3, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCCW, 4, Vector(2.0, -2.0, 0.0));
+
+    int arrayD = xsArrayCreateInt(2, 0, "Rotate I Down");
+    xsArraySetInt(rotationHeader, DOWN, arrayD);
+    // DCW
+    int arrayDCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Down CW"
+    );
+    xsArraySetInt(arrayD, CLOCKWISE, arrayDCW);
+    xsArraySetVector(arrayDCW, 0, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayDCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCW, 2, Vector(0.0, -2.0, 0.0));
+    xsArraySetVector(arrayDCW, 3, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCW, 4, Vector(2.0, -2.0, 0.0));
+    // DCCW
+    int arrayDCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Down CCW"
+    );
+    xsArraySetInt(arrayD, COUNTERCLOCKWISE, arrayDCCW);
+    xsArraySetVector(arrayDCCW, 0, Vector(-1.0, 0.0, 0.0));
+    xsArraySetVector(arrayDCCW, 1, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCCW, 2, Vector(-1.0, -2.0, 0.0));
+    xsArraySetVector(arrayDCCW, 3, Vector(1.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCCW, 4, Vector(-2.0, -2.0, 0.0));
+
+    int arrayL = xsArrayCreateInt(2, 0, "Rotate I Left");
+    xsArraySetInt(rotationHeader, LEFT, arrayL);
+    // LCW
+    int arrayLCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Left CW"
+    );
+    xsArraySetInt(arrayL, CLOCKWISE, arrayLCW);
+    xsArraySetVector(arrayLCW, 0, Vector(-1.0, 0.0, 0.0));
+    xsArraySetVector(arrayLCW, 1, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayLCW, 2, Vector(-1.0, -2.0, 0.0));
+    xsArraySetVector(arrayLCW, 3, Vector(1.0, 1.0, 0.0));
+    xsArraySetVector(arrayLCW, 4, Vector(-2.0, -2.0, 0.0));
+    // LCCW
+    int arrayLCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate I Left CCW"
+    );
+    xsArraySetInt(arrayL, COUNTERCLOCKWISE, arrayLCCW);
+    xsArraySetVector(arrayLCCW, 0, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayLCCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCCW, 2, Vector(0.0, 2.0, 0.0));
+    xsArraySetVector(arrayLCCW, 3, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCCW, 4, Vector(-2.0, 2.0, 0.0));
+}
+
+/// Initializes the rotation arrays for the J, L, S, T, and Z Tetrominos.
+void _initRotationX() {
+    int rotationHeader = xsArrayCreateInt(NUM_DIRS, 0, "Rotate X Offsets");
+    _setState(ROTATE_X_INDEX, rotationHeader);
+
+    int arrayU = xsArrayCreateInt(2, 0, "Rotate X Up");
+    xsArraySetInt(rotationHeader, UP, arrayU);
+    // UCW
+    int arrayUCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Up CW"
+    );
+    xsArraySetInt(arrayU, CLOCKWISE, arrayUCW);
+    xsArraySetVector(arrayUCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCW, 2, Vector(-1.0, -1.0, 0.0));
+    xsArraySetVector(arrayUCW, 3, Vector(2.0, 0.0, 0.0));
+    xsArraySetVector(arrayUCW, 4, Vector(2.0, -1.0, 0.0));
+    // UCCW
+    int arrayUCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Up CCW"
+    );
+    xsArraySetInt(arrayU, COUNTERCLOCKWISE, arrayUCCW);
+    xsArraySetVector(arrayUCCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayUCCW, 2, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayUCCW, 3, Vector(2.0, 0.0, 0.0));
+    xsArraySetVector(arrayUCCW, 4, Vector(2.0, 1.0, 0.0));
+
+    int arrayR = xsArrayCreateInt(2, 0, "Rotate X Right");
+    xsArraySetInt(rotationHeader, RIGHT, arrayR);
+    // RCW
+    int arrayRCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Right CW"
+    );
+    xsArraySetInt(arrayR, CLOCKWISE, arrayRCW);
+    xsArraySetVector(arrayRCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCW, 2, Vector(1.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCW, 3, Vector(-2.0, 0.0, 0.0));
+    xsArraySetVector(arrayRCW, 4, Vector(-2.0, 1.0, 0.0));
+    // RCCW
+    int arrayRCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Right CCW"
+    );
+    xsArraySetInt(arrayR, COUNTERCLOCKWISE, arrayRCCW);
+    xsArraySetVector(arrayRCCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCCW, 2, Vector(1.0, 1.0, 0.0));
+    xsArraySetVector(arrayRCCW, 3, Vector(-2.0, 0.0, 0.0));
+    xsArraySetVector(arrayRCCW, 4, Vector(-2.0, 1.0, 0.0));
+
+    int arrayD = xsArrayCreateInt(2, 0, "Rotate X Down");
+    xsArraySetInt(rotationHeader, DOWN, arrayD);
+    // DCW
+    int arrayDCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Down CW"
+    );
+    xsArraySetInt(arrayD, CLOCKWISE, arrayDCW);
+    xsArraySetVector(arrayDCW, 1, Vector(0.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCW, 2, Vector(-1.0, 1.0, 0.0));
+    xsArraySetVector(arrayDCW, 3, Vector(2.0, 0.0, 0.0));
+    xsArraySetVector(arrayDCW, 4, Vector(2.0, 1.0, 0.0));
+    // DCCW
+    int arrayDCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Down CCW"
+    );
+    xsArraySetInt(arrayD, COUNTERCLOCKWISE, arrayDCCW);
+    xsArraySetVector(arrayDCCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayDCCW, 2, Vector(-1.0, -1.0, 0.0));
+    xsArraySetVector(arrayDCCW, 3, Vector(2.0, 0.0, 0.0));
+    xsArraySetVector(arrayDCCW, 4, Vector(2.0, -1.0, 0.0));
+
+    int arrayL = xsArrayCreateInt(2, 0, "Rotate X Left");
+    xsArraySetInt(rotationHeader, LEFT, arrayL);
+    // LCW
+    int arrayLCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Left CW"
+    );
+    xsArraySetInt(arrayL, CLOCKWISE, arrayLCW);
+    xsArraySetVector(arrayLCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCW, 2, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCW, 3, Vector(-2.0, 0.0, 0.0));
+    xsArraySetVector(arrayLCW, 4, Vector(-2.0, -1.0, 0.0));
+    // LCCW
+    int arrayLCCW = xsArrayCreateVector(
+        NUM_ROTATION_TESTS, Vector(0.0, 0.0, 0.0), "Rotate X Left CCW"
+    );
+    xsArraySetInt(arrayL, COUNTERCLOCKWISE, arrayLCCW);
+    xsArraySetVector(arrayLCCW, 1, Vector(0.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCCW, 2, Vector(1.0, -1.0, 0.0));
+    xsArraySetVector(arrayLCCW, 3, Vector(-2.0, 0.0, 0.0));
+    xsArraySetVector(arrayLCCW, 4, Vector(-2.0, -1.0, 0.0));
+}
+
+/// Returns the array id of the test offset vectors to use in rotations.
+///
+/// Parameters:
+///     t: The Tetromino, one of `I`, `J`, `L`, `S`, `T`, and `Z`, but not `O`.
+///     d: The current facing direction.
+///     r: The rotation direction, one of `CLOCKWISE` or `COUNTERCLOCKWISE`.
+int _getRotationTests(int t = 0, int d = 0, int r = 0) {
+    int arrayHeaderId = 0;
+    if (t == I) {
+        arrayHeaderId = _getState(ROTATE_I_INDEX);
+    } else {
+        arrayHeaderId = _getState(ROTATE_X_INDEX);
+    }
+    int directionArrayId = xsArrayGetInt(arrayHeaderId, d);
+    return (xsArrayGetInt(directionArrayId, r));
+}
+
+/// Initializes the arrays of Tetromino rotation offsets.
+void _initRotationArrays() {
+    _initRotationI();
+    _initRotationX();
+}
+
+/// Returns `true` if the active Tetromino passes the rotation test at index
+/// `t` of the array with id `arrayId`.
+///
+/// Parameters:
+///     arrayId: The id of the array containing the tests.
+///     d: The target facing direction of the Tetromino.
+///     t: The test index, in `0..=4`.
+bool _testOneRotation(int arrayId = 0, int d = 0, int t = 0) {
+    int row = _activeRow();
+    int col = _activeCol();
+    int offsetArrayId = _getOffsets(_activeTetromino());
+    Vector testOffset = xsArrayGetVector(arrayId, t);
+    int dr = xsVectorGetX(testOffset);
+    int dc = xsVectorGetY(testOffset);
+    for (k = 0; < NUM_TILES) {
+        Vector v = xsArrayGetVector(offsetArrayId, k);
+        Vector v2 = _rotateVector(v, d);
+        int r = xsVectorGetX(v2) + row + dr;
+        int c = xsVectorGetY(v2) + col + dc;
+        if (_isInBoundsAndEmpty(r, c, d) == false) {
+            return (false);
+        }
+    }
+    return (true);
+}
+
+/// Returns the index of the test that passes, or `-1` if no test passes.
+/// The array to test against the currently active Tetromino.
+/// Requries the active Tetromino is not an `O`.
+///
+/// Parameters:
+///     r: The direction in which to rotate the active Tetromino.
+///         One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
+int _testRotations(int r = 0) {
+    int d = _activeFacing();
+    int arrayId = _getRotationTests(_activeTetromino(), d, r);
+    int newDir = _rotateDirection(d, r);
+    for (t = 0; < NUM_ROTATION_TESTS) {
+        if (_testOneRotation(arrayId, newDir, t)) {
+            return (t);
+        }
+    }
+    return (-1);
+}
+
+// =============================================================================
 // Scenario Initialization
 // =============================================================================
 
@@ -647,6 +1021,7 @@ void initXsArray() {
     _initUpdate();
     _initSequence();
     _initOffsetArrays();
+    _initRotationArrays();
 }
 
 // =============================================================================
@@ -729,61 +1104,64 @@ bool canStartNewGame() {
     return (_getSelectedBuilding() == NEW_GAME);
 }
 
-/// Returns `true` if the move left action is allowed.
-bool _canMoveLeft() {
-    if (_getSelectedBuilding() != MOVE_LEFT) {
-        return (false);
-    }
+/// Returns `true` if the active Tetromino can be translated by the offsets.
+///
+/// Parameters:
+///     dr: The number of rows to move, either `0` or `1`.
+///     dc: The number of columns to move, one of `-1`, `0`, or `1`.
+bool _canTranslate(int dr = 0, int dc = 0) {
+    int row = _activeRow();
+    int col = _activeCol();
+    int d = _activeFacing();
     int offsetArrayId = _getOffsets(_activeTetromino());
     for (k = 0; < NUM_TILES) {
         Vector v = xsArrayGetVector(offsetArrayId, k);
-        int y = xsVectorGetY(v);
-        int c = y + _activeCol();
-        if (c == 0) {
+        Vector v2 = _rotateVector(v, d);
+        int r = xsVectorGetX(v2) + row + dr;
+        int c = xsVectorGetY(v2) + col + dc;
+        if (_isInBoundsAndEmpty(r, c, d) == false) {
             return (false);
         }
-        // TODO handle pieces placed on the board
     }
     return (true);
+
+}
+
+/// Returns `true` if the move left action is allowed.
+bool _canMoveLeft() {
+    return (_getSelectedBuilding() == MOVE_LEFT && _canTranslate(0, -1));
 }
 
 /// Returns `true` if the move right action is allowed.
 bool _canMoveRight() {
-    // TODO handle multiple offsets and a populated board
-    return (
-        _getSelectedBuilding() == MOVE_RIGHT && _activeCol() < TETRIS_COLS - 1
-    );
+    return (_getSelectedBuilding() == MOVE_RIGHT && _canTranslate(0, 1));
 }
 
 /// Returns `true` if the rotate clockwise action is allowed.
 bool _canRotateClockwise() {
-    // TODO handle offsets
-    return (false && _getSelectedBuilding() == ROTATE_CLOCKWISE);
+    if (_getSelectedBuilding() != ROTATE_CLOCKWISE) {
+        return (false);
+    }
+    if (_activeTetromino() == O) {
+        return (true);
+    }
+    return (_testRotations(CLOCKWISE) != -1);
 }
 
 /// Returns `true` if the rotate counterclockwise action is allowed.
 bool _canRotateCounterclockwise() {
-    // TODO handle offsets
-    return (false && _getSelectedBuilding() == ROTATE_COUNTERCLOCKWISE);
+    if (_getSelectedBuilding() != ROTATE_COUNTERCLOCKWISE) {
+        return (false);
+    }
+    if (_activeTetromino() == O) {
+        return (true);
+    }
+    return (_testRotations(COUNTERCLOCKWISE) != -1);
 }
 
 /// Returns `true` if the soft drop action is allowed.
 bool _canSoftDrop() {
-    if (_getSelectedBuilding() != SOFT_DROP) {
-        return (false);
-    }
-    int offsetArrayId = _getOffsets(_activeTetromino());
-    for (k = 0; < NUM_TILES) {
-        Vector v = xsArrayGetVector(offsetArrayId, k);
-        int r = xsVectorGetX(v) + _activeRow();
-        if (r == TETRIS_ROWS - 1) {
-            return (false);
-        }
-    }
-    // TODO handle a populated board
-    return (
-        _getSelectedBuilding() == SOFT_DROP && _activeRow() < TETRIS_ROWS - 1
-    );
+    return (_getSelectedBuilding() == SOFT_DROP && _canTranslate(1, 0));
 }
 
 /// Returns `true` if the hard drop action is allowed.
@@ -800,6 +1178,8 @@ bool _canHold() {
 /// Translates the position of the active Tetromino and sets the render values
 /// in the update array.
 ///
+/// Requires: The translation is legal.
+///
 /// Parameters:
 ///     dr: The row offset by which to translate the active Tetromino.
 ///     dc: The column offset by which to translate the active Tetromino.
@@ -809,11 +1189,13 @@ void _translatePosition(int dr  = 0, int dc = 0) {
         int col = _activeCol();
         int d = _activeFacing();
         int t = _activeTetromino();
+        // TODO use new facing directions
         // Sets the currently active tiles to be rendered as Invisible Objects.
         for (k0 = 0; < NUM_TILES) {
             Vector v = xsArrayGetVector(offsetArrayId, k0);
-            int r0 = xsVectorGetX(v) + row;
-            int c0 = xsVectorGetY(v) + col;
+            Vector vRotated = _rotateVector(v, d);
+            int r0 = xsVectorGetX(vRotated) + row;
+            int c0 = xsVectorGetY(vRotated) + col;
             _setUpdateValue(r0, c0, d, 0, true);
         }
         // Sets the newly active tiles to be rendered as units.
@@ -821,8 +1203,9 @@ void _translatePosition(int dr  = 0, int dc = 0) {
         // from the previous loop.
         for (k1 = 0; < NUM_TILES) {
             Vector v1 = xsArrayGetVector(offsetArrayId, k1);
-            int r1 = xsVectorGetX(v1) + row;
-            int c1 = xsVectorGetY(v1) + col;
+            Vector v1Rotated = _rotateVector(v1, d);
+            int r1 = xsVectorGetX(v1Rotated) + row;
+            int c1 = xsVectorGetY(v1Rotated) + col;
             _setUpdateValue(r1 + dr, c1 + dc, d, 0, false);
             _setUpdateValue(r1 + dr, c1 + dc, d, t, true);
         }
@@ -830,32 +1213,63 @@ void _translatePosition(int dr  = 0, int dc = 0) {
         _setState(COL_INDEX, col + dc);
 }
 
+/// Rotates the active Tetromino in direction `r`.
+///
+/// Requires: The rotation is legal.
+///
+/// Parameters:
+///     r: The direction in which to rotate.
+///         One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
+void _rotatePosition(int r = 0) {
+    int offsetArrayId = _getOffsets(_activeTetromino());
+    int row = _activeRow();
+    int col = _activeCol();
+    int d = _activeFacing();
+    int newDir = _rotateDirection(d, r);
+    int t = _activeTetromino();
+    if (t == O) {
+        for (kO = 0; < NUM_TILES) {
+            Vector vO = xsArrayGetVector(offsetArrayId, kO);
+            int rO = xsVectorGetX(vO) + row;
+            int cO = xsVectorGetY(vO) + col;
+            _setUpdateValue(rO, cO, d, 0, true);
+            _setUpdateValue(rO, cO, newDir, t, true);
+        }
+    } else {
+        int testIndex = _testRotations(r);
+        int testArrayId = _getRotationTests(t, d, r);
+        Vector offset = xsArrayGetVector(testArrayId, testIndex);
+        int dr = xsVectorGetX(offset);
+        int dc = xsVectorGetY(offset);
+        for (k = 0; < NUM_TILES) {
+            Vector vUp = xsArrayGetVector(offsetArrayId, k);
+            Vector vOld = _rotateVector(vUp, d);
+            int rOld = xsVectorGetX(vOld) + row;
+            int cOld = xsVectorGetY(vOld) + col;
+            _setUpdateValue(rOld, cOld, d, 0, true);
+            Vector vNew = _rotateVector(vUp, newDir);
+            int rNew = xsVectorGetX(vNew) + row + dr;
+            int cNew = xsVectorGetY(vNew) + col + dc;
+            _setUpdateValue(rNew, cNew, newDir, t, true);
+        }
+        _setState(ROW_INDEX, row + dr);
+        _setState(COL_INDEX, col + dc);
+    }
+    _setState(DIR_INDEX, newDir);
+}
+
 /// Updates the game state.
 /// Call in a trigger after storing user input in the `Selected` variable
 /// and before executing the render triggers.
 void update() {
-    // TODO implement
     if (_canMoveLeft()) {
         _translatePosition(0, -1);
     } else if (_canMoveRight()) {
         _translatePosition(0, 1);
     } else if (_canRotateClockwise()) {
-        int cw = (_activeFacing() + 1) % NUM_DIRS;
-        _setUpdateValue(_activeRow(), _activeCol(), _activeFacing(), 0, true);
-        _setUpdateValue(
-            _activeRow(), _activeCol(), cw, _activeTetromino(), true
-        );
-        _setState(DIR_INDEX, cw);
+        _rotatePosition(CLOCKWISE);
     } else if (_canRotateCounterclockwise()) {
-        int ccw = _activeFacing() - 1;
-        if (ccw == -1) {
-            ccw = 3;
-        }
-        _setUpdateValue(_activeRow(), _activeCol(), _activeFacing(), 0, true);
-        _setUpdateValue(
-            _activeRow(), _activeCol(), ccw, _activeTetromino(), true
-        );
-        _setState(DIR_INDEX, ccw);
+        _rotatePosition(COUNTERCLOCKWISE);
     } else if (_canSoftDrop()) {
         _translatePosition(1, 0);
     } else if (_canHardDrop()) {
@@ -922,4 +1336,6 @@ void test() {
     //         xsChatData(_vecStr(v));
     //     }
     // }
+    // string s = "\"";
+    // xsChatData("\"");
 }

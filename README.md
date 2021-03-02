@@ -178,3 +178,13 @@ We generate the random numbers and perform the Fisher Yates algorithm in one gam
 ## Hold Piece
 
 ## Objectives
+
+## Rotations
+
+The rotations array holds multiple coordinates as vectors.
+
+```python
+xsArray[ROTATE_I_INDEX] = [facingI_U, facingI_R, facingI_D, facingI_L]
+facingI_U[CLOCKWISE] = [(0, 1), (0, -1), (0, 2), (1, -1), (-2, 1),]
+xsArray[ROTATE_X_INDEX] = [facingX_U, facingX_R, facingX_D, facingX_L]
+```
