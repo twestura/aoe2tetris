@@ -1351,26 +1351,35 @@ void update() {
         // clear lines and update the score
         // TODO implement
 
-        // Spawns a new Tetromino
+        // Spawns a new Tetromino.
+        // For now this is a hack to reuse multiple pieces.
+        // Need to re-randomize the sequence as a TODO.
         int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
         if (seqIndex == NUM_TETROMINOS - 1) {
+            for (seqK = 0; < NUM_TETROMINOS) {
+                int value0 = _getSequence(seqK);
+                int value1 = _getSequence(seqK + NUM_TETROMINOS);
+                _setSequence(seqK, value1);
+                _setSequence(seqK + NUM_TETROMINOS, value0);
+            }
             // TODO generate new sequence... this requires more triggers
+            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
         } else {
             _setState(TETROMINO_SEQUENCE_INDEX_INDEX, seqIndex + 1);
-            _setState(ROW_INDEX, PLACE_ROW);
-            _setState(COL_INDEX, PLACE_COL);
-            _setState(DIR_INDEX, PLACE_DIR);
-            // TODO check for defeat, then move Tetromino down if not defeated.
-            _setState(ROW_INDEX, PLACE_ROW + 1);
-            int offsetsId2 = _getOffsets(_activeTetromino());
-            for (k2 = 0; < NUM_TILES) {
-                Vector v2 = xsArrayGetVector(offsetsId2, k2);
-                int r2 = xsVectorGetX(v2) + _activeRow();
-                int c2 = xsVectorGetY(v2) + _activeCol();
-                _setUpdateValue(
-                    r2, c2, _activeFacing(), _activeTetromino(), true
-                );
-            }
+        }
+        _setState(ROW_INDEX, PLACE_ROW);
+        _setState(COL_INDEX, PLACE_COL);
+        _setState(DIR_INDEX, PLACE_DIR);
+        // TODO check for defeat, then move Tetromino down if not defeated.
+        _setState(ROW_INDEX, PLACE_ROW + 1);
+        int offsetsId2 = _getOffsets(_activeTetromino());
+        for (k2 = 0; < NUM_TILES) {
+            Vector v2 = xsArrayGetVector(offsetsId2, k2);
+            int r2 = xsVectorGetX(v2) + _activeRow();
+            int c2 = xsVectorGetY(v2) + _activeCol();
+            _setUpdateValue(
+                r2, c2, _activeFacing(), _activeTetromino(), true
+            );
         }
     } else if (_canHold()) {
         // TODO implement
