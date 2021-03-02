@@ -576,6 +576,63 @@ void _setAllUpdate(bool b = false) {
 }
 
 // =============================================================================
+// Clear Rows
+// =============================================================================
+
+/// Returns `true` if all tiles in `row` are occupied, `false` if any are empty.
+///
+/// Parameters:
+///     row: The row index to check, in `0..TETRIS_ROWS`.
+bool _isRowFilled(int row = 0) {
+    for (col = 0; < TETRIS_COLS) {
+        if (_isTileEmpty(row, col)) {
+            return (false);
+        }
+    }
+    return (true);
+}
+
+/// Returns the number of tiles filled in the row with index `row`.
+///
+/// Parameters:
+///     row: The row index to check, in `0..TETRIS_ROWS`.
+int _numFilled(int row = 0) {
+    int total = 0;
+    for (col = 0; < TETRIS_COLS) {
+        if (_isTileEmpty(row, col) == false) {
+            total++;
+        }
+    }
+    return (total);
+}
+
+/// Clears the row at index `row` and moves all rows above it one row down.
+///
+/// Parameters:
+///     row: The row index to begin moving, in `0..TETRIS_ROWS`.
+///         Requires `isRowFilled(row) == true`.
+void _moveRowsDown(int row = 0) {
+    int r = row;
+    while (r > 0) {
+        for (c = 0; < TETRIS_COLS) {
+            for (d = 0; < NUM_DIRS) {
+                int value = _getBoardValue(r - 1, c, d);
+                _setBoardValue(r, c, d, value);
+                for (t0 = 0; <= NUM_TETROMINOS) {
+                    _setUpdateValue(r, c, d, t0, false);
+                }
+                _setUpdateValue(r, c, d, value, true);
+                _setUpdateValue(r - 1, c, d, 0, true);
+                for (t1 = 1; <= NUM_TETROMINOS) {
+                    _setUpdateValue(r - 1, c, d, t1, false);
+                }
+            }
+        }
+        r--;
+    }
+}
+
+// =============================================================================
 // Tetromino Sequence
 // =============================================================================
 
@@ -1347,6 +1404,21 @@ void update() {
         }
         _setState(ROW_INDEX, _activeRow() + numRows);
 
+        int numCleared = 0;
+        int row = TETRIS_ROWS - 1;
+        while (row > 0 && numCleared < 4) {
+            int filled = _numFilled(row);
+            if (filled == 0) {
+                break;
+            }
+            if (filled == TETRIS_COLS) {
+                _moveRowsDown(row);
+                numCleared++;
+            } else {
+                row--;
+            }
+        }
+        // TODO make pieces explode or something fun
 
         // clear lines and update the score
         // TODO implement
@@ -1370,7 +1442,12 @@ void update() {
         _setState(ROW_INDEX, PLACE_ROW);
         _setState(COL_INDEX, PLACE_COL);
         _setState(DIR_INDEX, PLACE_DIR);
+
+        // if any of the offsets of placing a new piece or of moving it down
+        // one row are occupied, then the player is defeated.
+
         // TODO check for defeat, then move Tetromino down if not defeated.
+
         _setState(ROW_INDEX, PLACE_ROW + 1);
         int offsetsId2 = _getOffsets(_activeTetromino());
         for (k2 = 0; < NUM_TILES) {
