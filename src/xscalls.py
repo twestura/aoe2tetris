@@ -145,6 +145,17 @@ class ScriptCaller:
         """Returns a string to call the update game state function."""
         return self._call_function("update")
 
+    def shuffle(self) -> str:
+        """
+        Returns a condition string to check if the shuffle triggers should
+        be activated.
+        """
+        return self._call_function("canGenerateSecondSequence")
+
+    def is_game_over(self) -> str:
+        """Returns a condition string to check if a game is over."""
+        return self._call_function("isGameOver")
+
     def test(self) -> str:
         """Calls a string to call a test xs functions."""
         return self._call_function("test")

@@ -130,6 +130,7 @@ def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
 
 
 def _impl_rand_trees(
+    tdata: TetrisData,
     seq_index: int,
     seq: List[ProbTree],
     activator: TriggerObject,
@@ -145,6 +146,10 @@ def _impl_rand_trees(
             activator.add_effect(
                 Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
             )
+            if seq_index == 1:
+                tdata.shuffle.add_effect(
+                    Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id
+                )
         _impl_rand_tree(seq_index, tree, xs)
 
 
@@ -184,7 +189,7 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     * Places the first active piece on the game board.
     """
     t = tdata.begin_game
-    can = tdata.can_begin_initial
+    can = tdata.can_begin
     # Handles the initial hotkey press for starting the first game.
     university_id = tdata.hotkeys.building_map[Building.UNIVERSITY].reference_id
     can.add_condition(Condition.OBJECT_SELECTED, unit_object=university_id)
@@ -205,6 +210,10 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         trigger_id=tdata.new_game_objective.trigger_id,
     )
     can.add_effect(
+        Effect.DEACTIVATE_TRIGGER,
+        trigger_id=tdata.game_over_objective.trigger_id,
+    )
+    can.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.stat_objective.trigger_id
     )
     can.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id)
@@ -212,8 +221,8 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     # Initializes game variables.
     t.add_effect(Effect.SCRIPT_CALL, message=xs.begin_game())
 
-    _impl_rand_trees(0, tdata.seq_init0, t, xs)
-    _impl_rand_trees(1, tdata.seq_init1, t, xs)
+    _impl_rand_trees(tdata, 0, tdata.seq_init0, t, xs)
+    _impl_rand_trees(tdata, 1, tdata.seq_init1, t, xs)
 
     _impl_render_triggers(tdata, xs)
     tdata.begin_game.add_effect(
@@ -289,6 +298,28 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     # Update activates the render triggers, that way new game doesn't have to
     # deactivate them.
     tdata.update.add_effect(Effect.SCRIPT_CALL, message=xs.update())
+    tdata.update.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.shuffle.trigger_id
+    )
+    tdata.shuffle.add_condition(Condition.SCRIPT_CALL, xs_function=xs.shuffle())
+    tdata.update.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_over.trigger_id
+    )
+    tdata.cleanup.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.game_over.trigger_id
+    )
+    tdata.game_over.add_condition(
+        Condition.SCRIPT_CALL, xs_function=xs.is_game_over()
+    )
+    tdata.game_over.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
+    )
+    tdata.game_over.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_over_objective.trigger_id
+    )
+    tdata.game_over.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.can_begin.trigger_id
+    )
     for render in tdata.render_triggers.values():
         tdata.update.add_effect(
             Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
@@ -336,7 +367,11 @@ def _impl_hotkey_initialization(tdata: TetrisData):
 
 def _impl_objectives(variables: Variables, tdata: TetrisData):
     """Implements the triggers to initialize and display player score."""
-    for obj in (tdata.new_game_objective, tdata.stat_objective):
+    for obj in (
+        tdata.new_game_objective,
+        tdata.stat_objective,
+        tdata.game_over_objective,
+    ):
         obj.add_condition(Condition.PLAYER_DEFEATED, source_player=Player.GAIA)
 
 

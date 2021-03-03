@@ -82,6 +82,21 @@ def _generate_game_board(
     return board
 
 
+def _declare_game_over_objective(tmgr: TMgr) -> TriggerObject:
+    """Declares a trigger objective showing a message the game is over."""
+    display_string = 'Game Over! Press "Select all Universities" to play again.'
+    return tmgr.add_trigger(
+        "Game Over Objective",
+        display_as_objective=True,
+        display_on_screen=True,
+        description=display_string,
+        short_description=display_string,
+        mute_objectives=True,
+        enabled=False,
+        description_order=100,
+    )
+
+
 def _declare_new_game_objective(tmgr: TMgr) -> TriggerObject:
     """Declares a trigger objective prompting to start a new game."""
     display_string = 'Press "Select all Universities" to begin a new game.'
@@ -112,6 +127,7 @@ def _declare_stat_objective(tmgr: TMgr, variables: Variables) -> TriggerObject:
         short_description=display_string,
         mute_objectives=True,
         enabled=False,
+        description_order=0,
     )
 
 
@@ -211,8 +227,8 @@ def _declare_render_triggers(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
         # for r in range(rows // 2, rows // 2 + 1)  # Tests one row
-        # for r in range(rows // 2, rows // 2 + 3)  # Tests 3 rows
-        for r in range(rows // 2, rows)
+        for r in range(rows // 2, rows // 2 + 3)  # Tests 3 rows
+        # for r in range(rows // 2, rows)
         # for c in range(cols // 2 - 1, cols // 2)  # Tests 1 column
         for c in range(cols)
         # for d in [Direction.U]  # Tests 1 direction
@@ -247,8 +263,6 @@ class TetrisData:
         `building_x` is the x tile coordinate for spawning selection buildings.
         `building_y` is the y tile coordinate for spawning selection buildings.
         """
-
-        # TODO remove test map revealers
         revealer_len = mmgr.map_width // 2
         revlenadj = 15
         for x in range(revealer_len - revlenadj, revealer_len + revlenadj):
@@ -267,15 +281,15 @@ class TetrisData:
         self._init_scenario = tmgr.add_trigger("Init Scenario")
 
         tmgr.add_trigger("-- Objectives --", enabled=False)
+        self._game_over_objective = _declare_game_over_objective(tmgr)
         self._new_game_objective = _declare_new_game_objective(tmgr)
         self._stat_obj = _declare_stat_objective(tmgr, variables)
 
         tmgr.add_trigger("-- Begin Game --", enabled=False)
 
-        self._can_begin_initial = tmgr.add_trigger("Can Begin First Game")
+        self._can_begin = tmgr.add_trigger("Can Begin Game")
         self._begin_game = tmgr.add_trigger("Begin Game", enabled=False)
         self._seq_init0 = _declare_sequence_init(tmgr, "Init a")
-        self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         self._begin_game_mid = tmgr.add_trigger(
             "Begin Game Middle", enabled=False
         )
@@ -287,7 +301,12 @@ class TetrisData:
         self._selection_triggers = _declare_selection_triggers(tmgr)
         self._new_game = tmgr.add_trigger("New Game", enabled=False)
         self._update = tmgr.add_trigger("Update", enabled=False)
+        self._shuffle = tmgr.add_trigger("Activate Shuffle", enabled=False)
+        self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
+        # TODO render next
+        # TODO render hold
+        self._game_over = tmgr.add_trigger("Game Over", enabled=False)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
 
@@ -302,31 +321,23 @@ class TetrisData:
         return self._new_game_objective
 
     @property
+    def game_over_objective(self) -> TriggerObject:
+        """Returns a trigger for an objective saying the game is over."""
+        return self._game_over_objective
+
+    @property
     def seq_init0(self) -> List[ProbTree]:
         """Returns the first sequence initialization triggers."""
         return self._seq_init0
 
     @property
-    def seq_init1(self) -> List[ProbTree]:
-        """Returns the second sequence initialization triggers."""
-        return self._seq_init1
-
-    # @property
-    # def place_init_piece(self) -> Dict[Tetromino, TriggerObject]:
-    #     """
-    #     Returns the triggers for placing a Tetromino at the start.
-
-    #     Maps a Tetromino to the trigger for placing it.
-    #     """
-    # return self._place_init_piece
-
-    @property
-    def can_begin_initial(self) -> TriggerObject:
+    def can_begin(self) -> TriggerObject:
         """
         Returns a trigger for checking the condition of whether the first game
-        can begin when the scenario initially is loaded.
+        can begin when the scenario initially is loaded or a new game can begin
+        after a game of Tetris is over.
         """
-        return self._can_begin_initial
+        return self._can_begin
 
     @property
     def begin_game(self) -> TriggerObject:
@@ -374,6 +385,16 @@ class TetrisData:
         return self._update
 
     @property
+    def shuffle(self) -> TriggerObject:
+        """Returns a trigger for shuffling the second Tetromino sequence."""
+        return self._shuffle
+
+    @property
+    def seq_init1(self) -> List[ProbTree]:
+        """Returns the second sequence initialization triggers."""
+        return self._seq_init1
+
+    @property
     def render_triggers(
         self,
     ) -> Dict[Tuple[Index, Direction, Optional[Tetromino]], TriggerObject]:
@@ -388,6 +409,11 @@ class TetrisData:
         game ticks update stage.
         """
         return self._render_triggers
+
+    @property
+    def game_over(self) -> TriggerObject:
+        """Returns a trigger for toggling the Game Over state."""
+        return self._game_over
 
     @property
     def cleanup(self) -> TriggerObject:

@@ -63,8 +63,21 @@ const int ROTATE_I_INDEX = 9;
 /// The xs-index of the J, L, S, T, and Z Tetromino rotation offsets.
 const int ROTATE_X_INDEX = 10;
 
+/// The xs-index of the flag to determine whether the 2nd xs sequence
+/// should be suffled at the end of a game loop.
+/// The variable is `SHUFFLE` when it should be shuffled and `NOSHUFFLE`
+/// when it should not be shuffled.
+const int SEQ_SHUFFLE_INDEX = 11;
+
+/// The xs-index of the flag to indicate whether the previous score action
+/// qualifies for a difficulty bonus.
+const int DIFFICULT_INDEX = 12;
+
+/// The xs-index of the flag to indicate whether the game is playing or over.
+const int GAME_OVER_OR_PLAYING_INDEX = 13;
+
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 11;
+const int NUM_XS_ARRAY_ELEMENTS = 14;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -157,6 +170,27 @@ const int SOFT_DROP_MULTIPLIER = 1;
 /// For every line passed in a Hard Drop, the player's score increases by
 /// the player's current level multiplied by `HARD_DROP_MULTIPLIER`.
 const int HARD_DROP_MULTIPLIER = 2;
+
+/// Indicates the 2nd Tetromino sequence does not need to be shuffled.
+const int NOSHUFFLE = 0;
+
+/// Indicates the 2nd Tetromino sequence needs to be shuffled.
+const int SHUFFLE = 1;
+
+/// Indicates the previous score does not qualify for a difficulty bonus.
+const int NOT_DIFFICULT = 0;
+
+/// Indicates the previous score qualifies for a difficulty bonus.
+const int DIFFICULT = 1;
+
+/// The number of lines to clear in order to level up.
+const int LINES_PER_LEVEL = 10;
+
+/// Represents the game-over state.
+const int GAME_OVER = 0;
+
+/// Represents the game playing state.
+const int GAME_PLAYING = 1;
 
 /// Writes a chat message containing the values of the array.
 ///
@@ -689,6 +723,12 @@ void swapSeqValues(int seqNum = 0, int i = 0, int j = 0) {
     _setSequence(index1, x);
 }
 
+/// Returns `true` if the second Tetromino sequence should be randomized,
+/// False otherwise.
+bool canGenerateSecondSequence() {
+    return (_getState(SEQ_SHUFFLE_INDEX) == SHUFFLE);
+}
+
 // =============================================================================
 // Position State Information
 // =============================================================================
@@ -1110,6 +1150,8 @@ void beginGame() {
     _clearBoard();
     _clearUpdate();
     _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
+    _setState(DIFFICULT_INDEX, NOT_DIFFICULT);
+    _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_PLAYING);
 }
 
 /// Initializes the state necessary for placing a Tetromino on the board.
@@ -1162,15 +1204,22 @@ int _getSelectedBuilding() {
 /// Initializes the game state at the start of each game loop.
 ///
 /// Resets the selection variable to be unselected.
-/// Saves the previous game state.
+/// Clears the second sequence's shuffle state.
+/// Clears the render update board.
 void initGameLoop() {
-    selectBuilding(0);
+    selectBuilding(NO_ACTION);
+    _setState(SEQ_SHUFFLE_INDEX, SHUFFLE);
     _setAllUpdate(false);
 }
 
 /// Returns `true` if the selected action is to start a new game.
 bool canStartNewGame() {
     return (_getSelectedBuilding() == NEW_GAME);
+}
+
+/// Returns `true` if the game is over, `false` if the game is ongoing.
+bool isGameOver() {
+    return (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER);
 }
 
 /// Returns `true` if the active Tetromino can be translated by the offsets.
@@ -1198,16 +1247,26 @@ bool _canTranslate(int dr = 0, int dc = 0) {
 
 /// Returns `true` if the move left action is allowed.
 bool _canMoveLeft() {
-    return (_getSelectedBuilding() == MOVE_LEFT && _canTranslate(0, -1));
+    return (
+        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
+        && _getSelectedBuilding() == MOVE_LEFT
+        && _canTranslate(0, -1));
 }
 
 /// Returns `true` if the move right action is allowed.
 bool _canMoveRight() {
-    return (_getSelectedBuilding() == MOVE_RIGHT && _canTranslate(0, 1));
+    return (
+        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
+        && _getSelectedBuilding() == MOVE_RIGHT
+        && _canTranslate(0, 1)
+    );
 }
 
 /// Returns `true` if the rotate clockwise action is allowed.
 bool _canRotateClockwise() {
+    if (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER) {
+        return (false);
+    }
     if (_getSelectedBuilding() != ROTATE_CLOCKWISE) {
         return (false);
     }
@@ -1219,6 +1278,9 @@ bool _canRotateClockwise() {
 
 /// Returns `true` if the rotate counterclockwise action is allowed.
 bool _canRotateCounterclockwise() {
+    if (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER) {
+        return (false);
+    }
     if (_getSelectedBuilding() != ROTATE_COUNTERCLOCKWISE) {
         return (false);
     }
@@ -1230,18 +1292,28 @@ bool _canRotateCounterclockwise() {
 
 /// Returns `true` if the soft drop action is allowed.
 bool _canSoftDrop() {
-    return (_getSelectedBuilding() == SOFT_DROP && _canTranslate(1, 0));
+    return (
+        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
+        && _getSelectedBuilding() == SOFT_DROP
+        && _canTranslate(1, 0)
+    );
 }
 
 /// Returns `true` if the hard drop action is allowed.
 bool _canHardDrop() {
-    return (_getSelectedBuilding() == HARD_DROP);
+    return (
+        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
+        && _getSelectedBuilding() == HARD_DROP
+    );
 }
 
 /// Returns `true` if the hold action is allowed.
 bool _canHold() {
     // TODO handle multiple holds without resetting
-    return (_getSelectedBuilding() == HOLD);
+    return (
+        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
+        && _getSelectedBuilding() == HOLD
+    );
 }
 
 /// Translates the position of the active Tetromino and sets the render values
@@ -1346,7 +1418,6 @@ bool _canDrop(int r = 0) {
     return (true);
 }
 
-/// Returns the number of rows beneath the active Tetromino that have an opening
 /// into which the Tetromino may drop.
 int _numDropRows() {
     int r = _activeRow() + 1;
@@ -1355,6 +1426,55 @@ int _numDropRows() {
         r++;
     }
     return (r - 1 - _activeRow());
+}
+
+/// Activates the next Tetromino, ending the game if there is no room
+/// to spawn it.
+void _spawnNextTetromino() {
+        int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
+        if (seqIndex == NUM_TETROMINOS - 1) {
+            for (seqK = 0; < NUM_TETROMINOS) {
+                int value0 = _getSequence(seqK);
+                int value1 = _getSequence(seqK + NUM_TETROMINOS);
+                _setSequence(seqK, value1);
+                _setSequence(seqK + NUM_TETROMINOS, seqK + 1);
+            }
+            _setState(SEQ_SHUFFLE_INDEX, SHUFFLE);
+            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
+        } else {
+            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, seqIndex + 1);
+        }
+
+        // If any of the offsets of placing a new piece or of moving it down
+        // one row are occupied, then the player is defeated.
+        _setState(ROW_INDEX, PLACE_ROW);
+        _setState(COL_INDEX, PLACE_COL);
+        _setState(DIR_INDEX, PLACE_DIR);
+
+        // Check for defeats, and moves the Tetromino down.
+        int offsetsId1 = _getOffsets(_activeTetromino());
+        for (k1 = 0; < NUM_TILES) {
+            Vector v1 = xsArrayGetVector(offsetsId1, k1);
+            int r1 = xsVectorGetX(v1) + _activeRow();
+            int c1 = xsVectorGetY(v1) + _activeCol();
+            if (_isInBoundsAndEmpty(r1, c1) == false) {
+                _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_OVER);
+            }
+        }
+
+        _setState(ROW_INDEX, PLACE_ROW + 1);
+        int offsetsId2 = _getOffsets(_activeTetromino());
+        for (k2 = 0; < NUM_TILES) {
+            Vector v2 = xsArrayGetVector(offsetsId2, k2);
+            int r2 = xsVectorGetX(v2) + _activeRow();
+            int c2 = xsVectorGetY(v2) + _activeCol();
+            if (_isInBoundsAndEmpty(r2, c2) == false) {
+                _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_OVER);
+            }
+            _setUpdateValue(
+                r2, c2, _activeFacing(), _activeTetromino(), true
+            );
+        }
 }
 
 /// Updates the game state.
@@ -1424,6 +1544,8 @@ void update() {
         // TODO remove magic numbers
         int oldScore = xsTriggerVariable(SCORE_ID);
         int oldLevel = xsTriggerVariable(LEVEL_ID);
+        int oldDifficult = _getState(DIFFICULT_INDEX);
+        int difficult = NOT_DIFFICULT;
         if (numCleared == 1) {
             xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 100);
         } else if (numCleared == 2) {
@@ -1431,54 +1553,23 @@ void update() {
         } else if (numCleared == 3) {
             xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 500);
         } else if (numCleared == 4) {
-            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 800);
-            // TODO keep track of "difficult" scores
+            int scoreClear4 = 800;
+            if (oldDifficult == DIFFICULT) {
+                scoreClear4 = scoreClear4 * 3 / 2;
+            }
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * scoreClear4);
+            difficult = DIFFICULT;
         }
 
         xsSetTriggerVariable(
             LINES_ID, xsTriggerVariable(LINES_ID) + numCleared
         );
-        // TODO get rid of 10 as a magic value
         xsSetTriggerVariable(
-            LEVEL_ID, (xsTriggerVariable(LINES_ID) + 10) / 10
+            LEVEL_ID,
+            (xsTriggerVariable(LINES_ID) + LINES_PER_LEVEL) / LINES_PER_LEVEL
         );
-
-
-        // Spawns a new Tetromino.
-        // For now this is a hack to reuse multiple pieces.
-        // Need to re-randomize the sequence as a TODO.
-        int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
-        if (seqIndex == NUM_TETROMINOS - 1) {
-            for (seqK = 0; < NUM_TETROMINOS) {
-                int value0 = _getSequence(seqK);
-                int value1 = _getSequence(seqK + NUM_TETROMINOS);
-                _setSequence(seqK, value1);
-                _setSequence(seqK + NUM_TETROMINOS, value0);
-            }
-            // TODO generate new sequence... this requires more triggers
-            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
-        } else {
-            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, seqIndex + 1);
-        }
-        _setState(ROW_INDEX, PLACE_ROW);
-        _setState(COL_INDEX, PLACE_COL);
-        _setState(DIR_INDEX, PLACE_DIR);
-
-        // if any of the offsets of placing a new piece or of moving it down
-        // one row are occupied, then the player is defeated.
-
-        // TODO check for defeat, then move Tetromino down if not defeated.
-
-        _setState(ROW_INDEX, PLACE_ROW + 1);
-        int offsetsId2 = _getOffsets(_activeTetromino());
-        for (k2 = 0; < NUM_TILES) {
-            Vector v2 = xsArrayGetVector(offsetsId2, k2);
-            int r2 = xsVectorGetX(v2) + _activeRow();
-            int c2 = xsVectorGetY(v2) + _activeCol();
-            _setUpdateValue(
-                r2, c2, _activeFacing(), _activeTetromino(), true
-            );
-        }
+        _setState(DIFFICULT_INDEX, difficult);
+        _spawnNextTetromino();
     } else if (_canHold()) {
         // TODO implement
     }
