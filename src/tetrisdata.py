@@ -19,6 +19,9 @@ from probtree import ChanceNode, ProbTree
 from tetromino import Tetromino
 from variables import Variables
 
+# Unit constant for a Forage Bush, which is an "Other" object not yet
+# added to the library.
+FORAGE_BUSH = 59
 
 # Unit constant for a map revealer, which isn't in any of the libraries.
 # Replace if library is updated for "Other" units.

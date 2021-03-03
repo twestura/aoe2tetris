@@ -1420,8 +1420,29 @@ void update() {
         }
         // TODO make pieces explode or something fun
 
-        // clear lines and update the score
-        // TODO implement
+        // Note that the level is the level before the line clear.
+        // TODO remove magic numbers
+        int oldScore = xsTriggerVariable(SCORE_ID);
+        int oldLevel = xsTriggerVariable(LEVEL_ID);
+        if (numCleared == 1) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 100);
+        } else if (numCleared == 2) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 300);
+        } else if (numCleared == 3) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 500);
+        } else if (numCleared == 4) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 800);
+            // TODO keep track of "difficult" scores
+        }
+
+        xsSetTriggerVariable(
+            LINES_ID, xsTriggerVariable(LINES_ID) + numCleared
+        );
+        // TODO get rid of 10 as a magic value
+        xsSetTriggerVariable(
+            LEVEL_ID, (xsTriggerVariable(LINES_ID) + 10) / 10
+        );
+
 
         // Spawns a new Tetromino.
         // For now this is a hack to reuse multiple pieces.
