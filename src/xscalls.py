@@ -156,6 +156,21 @@ class ScriptCaller:
         """Returns a condition string to check if a game is over."""
         return self._call_function("isGameOver")
 
+    def can_render_next(self, index: int, t: Tetromino) -> str:
+        """
+        Returns a condition string to check if the next board at the given
+        `index` should be updated to display `Tetromino` `t`.
+
+        Parameters:
+            index: One of `0`, `1`, or `2`.
+            t: The value of the `Tetromino` to display.
+        Raises:
+            ValueError if `index` does not reprent the index of a next board.
+        """
+        if index not in {0, 1, 2}:
+            raise ValueError(f"{index} must be `0`, `1`, or `2`.")
+        return self._call_function("canRenderNext", [str(index), str(t.value)])
+
     def test(self) -> str:
         """Calls a string to call a test xs functions."""
         return self._call_function("test")

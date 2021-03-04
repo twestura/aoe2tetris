@@ -79,15 +79,19 @@ def output_path() -> str:
 
 def _impl_init_invisible_object_ownership(tdata: TetrisData):
     """Implements converting the game board from Player one to Gaia."""
+    units = []
+    for tile in tdata.board.visible():
+        for u in tile.values():
+            units.append(u)
+    for board in tdata.next_units:
+        for row in board:
+            for u in row:
+                units.append(u)
     tdata.init_scenario.add_effect(
         Effect.CHANGE_OWNERSHIP,
         source_player=Player.ONE,
         target_player=Player.GAIA,
-        selected_object_ids=[
-            u.reference_id
-            for tile in tdata.board.visible()
-            for u in tile.values()
-        ],
+        selected_object_ids=([u.reference_id for u in units]),
     )
 
 
@@ -176,6 +180,46 @@ def _impl_render_triggers(tdata: TetrisData, xs: ScriptCaller):
         )
 
 
+def _impl_render_next_triggers(tdata: TetrisData, xs: ScriptCaller):
+    """Implements the triggers for updating the next unit boards."""
+    for index, (trigger_board, unit_board) in enumerate(
+        zip(tdata.render_next_triggers, tdata.next_units)
+    ):
+        # TODO debug the occasional wrong Tetromino...
+        all_unit_ids = {u.reference_id for row in unit_board for u in row}
+        for t, trigger in enumerate(trigger_board):
+            tetromino = Tetromino.from_int(t + 1)
+            trigger.add_condition(
+                Condition.SCRIPT_CALL,
+                xs_function=xs.can_render_next(index, tetromino),
+            )
+            gaia_id_set = all_unit_ids - tetromino.board_unit_ids(unit_board)
+            unit_ids = list(all_unit_ids - gaia_id_set)
+            gaia_ids = list(gaia_id_set)
+            trigger.add_effect(
+                Effect.CHANGE_OWNERSHIP,
+                target_player=tetromino.player,
+                selected_object_ids=unit_ids,
+            )
+            trigger.add_effect(
+                Effect.REPLACE_OBJECT,
+                target_player=tetromino.player,
+                object_list_unit_id_2=tetromino.unit,
+                selected_object_ids=unit_ids,
+            )
+            trigger.add_effect(
+                Effect.CHANGE_OWNERSHIP,
+                target_player=Player.GAIA,
+                selected_object_ids=gaia_ids,
+            )
+            trigger.add_effect(
+                Effect.REPLACE_OBJECT,
+                target_player=Player.GAIA,
+                object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+                selected_object_ids=gaia_ids,
+            )
+
+
 def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     """
     Implents the trigger to initialize the game and begin the game loop.
@@ -225,6 +269,7 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     _impl_rand_trees(tdata, 1, tdata.seq_init1, t, xs)
 
     _impl_render_triggers(tdata, xs)
+    _impl_render_next_triggers(tdata, xs)
     tdata.begin_game.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_mid.trigger_id
     )
@@ -238,6 +283,14 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         tdata.begin_game_end.add_effect(
             Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
         )
+    for render_next_list in tdata.render_next_triggers:
+        for render_next in render_next_list:
+            tdata.begin_game_mid.add_effect(
+                Effect.ACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
+            )
+            tdata.begin_game_end.add_effect(
+                Effect.DEACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
+            )
     tdata.begin_game_mid.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
@@ -327,6 +380,14 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         tdata.cleanup.add_effect(
             Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
         )
+    for render_next_list in tdata.render_next_triggers:
+        for render_next in render_next_list:
+            tdata.update.add_effect(
+                Effect.ACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
+            )
+            tdata.cleanup.add_effect(
+                Effect.DEACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
+            )
 
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id

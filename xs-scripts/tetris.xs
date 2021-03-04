@@ -76,8 +76,11 @@ const int DIFFICULT_INDEX = 12;
 /// The xs-index of the flag to indicate whether the game is playing or over.
 const int GAME_OVER_OR_PLAYING_INDEX = 13;
 
+/// The xs-index of the flag for whether or not to render the next board.
+const int CAN_RENDER_NEXT_INDEX = 14;
+
 /// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 14;
+const int NUM_XS_ARRAY_ELEMENTS = 15;
 
 /// The id of the variable that holds the player's score.
 const int SCORE_ID = 1;
@@ -191,6 +194,12 @@ const int GAME_OVER = 0;
 
 /// Represents the game playing state.
 const int GAME_PLAYING = 1;
+
+/// Represents that the next boards do not need to be updated.
+const int NO_RENDER_NEXT = 0;
+
+/// Represents that the next boards need to be updated.
+const int RENDER_NEXT = 1;
 
 /// Writes a chat message containing the values of the array.
 ///
@@ -1152,6 +1161,7 @@ void beginGame() {
     _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
     _setState(DIFFICULT_INDEX, NOT_DIFFICULT);
     _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_PLAYING);
+    _setState(CAN_RENDER_NEXT_INDEX, RENDER_NEXT);
 }
 
 /// Initializes the state necessary for placing a Tetromino on the board.
@@ -1208,7 +1218,8 @@ int _getSelectedBuilding() {
 /// Clears the render update board.
 void initGameLoop() {
     selectBuilding(NO_ACTION);
-    _setState(SEQ_SHUFFLE_INDEX, SHUFFLE);
+    _setState(SEQ_SHUFFLE_INDEX, NOSHUFFLE);
+    _setState(CAN_RENDER_NEXT_INDEX, NO_RENDER_NEXT);
     _setAllUpdate(false);
 }
 
@@ -1428,15 +1439,71 @@ int _numDropRows() {
     return (r - 1 - _activeRow());
 }
 
+/// Updates the score when `numCleared` lines are cleared.
+///
+/// Parameters:
+///     numCleared: The number of lines cleared, in `0..=4`.
+void _updateScore(int numCleared = 0) {
+        // TODO T-Spin checks
+        // Note that the level is the level before the line clear.
+        int oldScore = xsTriggerVariable(SCORE_ID);
+        int oldLevel = xsTriggerVariable(LEVEL_ID);
+        int oldDifficult = _getState(DIFFICULT_INDEX);
+        int difficult = NOT_DIFFICULT;
+        if (numCleared == 1) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 100);
+        } else if (numCleared == 2) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 300);
+        } else if (numCleared == 3) {
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 500);
+        } else if (numCleared == 4) {
+            int scoreClear4 = 800;
+            if (oldDifficult == DIFFICULT) {
+                scoreClear4 = scoreClear4 * 3 / 2;
+            }
+            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * scoreClear4);
+            difficult = DIFFICULT;
+        }
+
+        xsSetTriggerVariable(
+            LINES_ID, xsTriggerVariable(LINES_ID) + numCleared
+        );
+        xsSetTriggerVariable(
+            LEVEL_ID,
+            (xsTriggerVariable(LINES_ID) + LINES_PER_LEVEL) / LINES_PER_LEVEL
+        );
+        _setState(DIFFICULT_INDEX, difficult);
+}
+
+/// Clears lines and updates the game score after a Tetromino is locked
+/// on the board.
+void _clearLines() {
+        int numCleared = 0;
+        int row = TETRIS_ROWS - 1;
+        while (row > 0 && numCleared < 4) {
+            int filled = _numFilled(row);
+            if (filled == 0) {
+                break;
+            }
+            if (filled == TETRIS_COLS) {
+                _moveRowsDown(row);
+                numCleared++;
+            } else {
+                row--;
+            }
+        }
+        // TODO make pieces explode or something fun
+        _updateScore(numCleared);
+}
+
 /// Activates the next Tetromino, ending the game if there is no room
 /// to spawn it.
 void _spawnNextTetromino() {
         int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
         if (seqIndex == NUM_TETROMINOS - 1) {
             for (seqK = 0; < NUM_TETROMINOS) {
-                int value0 = _getSequence(seqK);
-                int value1 = _getSequence(seqK + NUM_TETROMINOS);
-                _setSequence(seqK, value1);
+                int value = _getSequence(seqK + NUM_TETROMINOS);
+                _setSequence(seqK, value);
                 _setSequence(seqK + NUM_TETROMINOS, seqK + 1);
             }
             _setState(SEQ_SHUFFLE_INDEX, SHUFFLE);
@@ -1475,6 +1542,7 @@ void _spawnNextTetromino() {
                 r2, c2, _activeFacing(), _activeTetromino(), true
             );
         }
+        _setState(CAN_RENDER_NEXT_INDEX, RENDER_NEXT);
 }
 
 /// Updates the game state.
@@ -1498,14 +1566,13 @@ void update() {
         );
     } else if (_canHardDrop()) {
         int numRows = _numDropRows();
-        int scoreHard = xsTriggerVariable(SCORE_ID);
-        int levelHard = xsTriggerVariable(LEVEL_ID);
+        int score = xsTriggerVariable(SCORE_ID);
+        int level = xsTriggerVariable(LEVEL_ID);
         xsSetTriggerVariable(
-            SCORE_ID, scoreHard + HARD_DROP_MULTIPLIER * levelHard * numRows
+            SCORE_ID, score + HARD_DROP_MULTIPLIER * level * numRows
         );
-
-        // Drops the Tetromino.
         int offsetsId = _getOffsets(_activeTetromino());
+        // Sets the update array to clear the previous position.
         for (k0 = 0; < NUM_TILES) {
             Vector v0 = xsArrayGetVector(offsetsId, k0);
             Vector v0Rotated = _rotateVector(v0, _activeFacing());
@@ -1513,6 +1580,7 @@ void update() {
             int c0 = xsVectorGetY(v0Rotated) + _activeCol();
             _setUpdateValue(r0, c0, _activeFacing(), 0, true);
         }
+        // Sets the update array to render the new position.
         for (k1 = 0; < NUM_TILES) {
             Vector v1 = xsArrayGetVector(offsetsId, k1);
             Vector v1Rotated = _rotateVector(v1, _activeFacing());
@@ -1523,52 +1591,7 @@ void update() {
             _setBoardValue(r1, c1, _activeFacing(), _activeTetromino());
         }
         _setState(ROW_INDEX, _activeRow() + numRows);
-
-        int numCleared = 0;
-        int row = TETRIS_ROWS - 1;
-        while (row > 0 && numCleared < 4) {
-            int filled = _numFilled(row);
-            if (filled == 0) {
-                break;
-            }
-            if (filled == TETRIS_COLS) {
-                _moveRowsDown(row);
-                numCleared++;
-            } else {
-                row--;
-            }
-        }
-        // TODO make pieces explode or something fun
-
-        // Note that the level is the level before the line clear.
-        // TODO remove magic numbers
-        int oldScore = xsTriggerVariable(SCORE_ID);
-        int oldLevel = xsTriggerVariable(LEVEL_ID);
-        int oldDifficult = _getState(DIFFICULT_INDEX);
-        int difficult = NOT_DIFFICULT;
-        if (numCleared == 1) {
-            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 100);
-        } else if (numCleared == 2) {
-            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 300);
-        } else if (numCleared == 3) {
-            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 500);
-        } else if (numCleared == 4) {
-            int scoreClear4 = 800;
-            if (oldDifficult == DIFFICULT) {
-                scoreClear4 = scoreClear4 * 3 / 2;
-            }
-            xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * scoreClear4);
-            difficult = DIFFICULT;
-        }
-
-        xsSetTriggerVariable(
-            LINES_ID, xsTriggerVariable(LINES_ID) + numCleared
-        );
-        xsSetTriggerVariable(
-            LEVEL_ID,
-            (xsTriggerVariable(LINES_ID) + LINES_PER_LEVEL) / LINES_PER_LEVEL
-        );
-        _setState(DIFFICULT_INDEX, difficult);
+        _clearLines();
         _spawnNextTetromino();
     } else if (_canHold()) {
         // TODO implement
@@ -1594,12 +1617,22 @@ bool canRenderTile(int r = 0, int c = 0, int d = 0, int t = 0) {
 /// replaced with units of shape `t`, `false` if not.
 ///
 /// Parameters:
-///     index: Either 1, 2, or 3, indicating which of the next 3 pieces
+///     index: Either 0, 1, or 2, indicating which of the next 3 pieces
 ///         to place.
 ///     t: The Tetromino value for the piece to render. In `1..=7`.
 bool canRenderNext(int index = 0, int t = 0) {
-    // TODO implement
-    return (false);
+    if (_getState(CAN_RENDER_NEXT_INDEX) == NO_RENDER_NEXT) {
+        return (false);
+    }
+    int currentIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
+    int prevIndex = currentIndex + index;
+    int prevTetromino = _getSequence(prevIndex);
+    int nextIndex = currentIndex + 1 + index;
+    int nextTetromino = _getSequence(nextIndex);
+    // The next board should be updated to display Tetromino `t` if `t` is at
+    // the board's sequence index and the board does not currently
+    // contain that Tetromino.
+    return (t == nextTetromino && prevTetromino != nextTetromino);
 }
 
 /// Returns `true` if the Hold unit should have its units replaced with
@@ -1615,23 +1648,4 @@ bool canRenderHold(int t = 0) {
 
 /// Scratch test function.
 void test() {
-    // float mid = 0.0 - 2.0;
-    // Vector v = Vector(1.0, -2.0, 0.0);
-    // int x = xsVectorGetX(v);
-    // int y = xsVectorGetY(v);
-    // xsChatData("(" + x + ", " + y + ")");
-    // Vector v1 = Vector(1.0, 2.0, 0.0);
-    // float x1 = xsVectorGetX(v1);
-    // xsChatData("" + (x == x1));
-    // int offsetArrayContainerId = _getState(TETROMINO_OFFSETS_INDEX);
-    // for (t = 0; < NUM_TETROMINOS) {
-    //     xsChatData("Array " + t);
-    //     int arrayId = xsArrayGetInt(offsetArrayContainerId, t);
-    //     for (j = 0; < NUM_TILES) {
-    //         Vector v = xsArrayGetVector(arrayId, j);
-    //         xsChatData(_vecStr(v));
-    //     }
-    // }
-    // string s = "\"";
-    // xsChatData("\"");
 }

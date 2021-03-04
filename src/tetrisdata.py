@@ -7,6 +7,7 @@ from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
 from AoE2ScenarioParser.objects.map_obj import MapObject as MMgr
+from AoE2ScenarioParser.objects.unit_obj import UnitObject
 from AoE2ScenarioParser.objects.units_obj import UnitsObject as UMgr
 from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from AoE2ScenarioParser.objects.triggers_obj import TriggersObject as TMgr
@@ -18,6 +19,20 @@ from index import Index
 from probtree import ChanceNode, ProbTree
 from tetromino import Tetromino
 from variables import Variables
+
+# A `2 x 4` board of units.
+NextBoard = List[List[UnitObject]]
+
+# The outer list consists of 3 three lists, with the list at index `k`
+# containing the render update triggers for the Tetromino at
+# at `current_index + 1 + k`. That is, the first "next" piece's render triggers
+# are at index `0`.
+# Each inner list has index `c` as a trigger for rendering the Tetromino with
+# value `c + 1`.
+NextRenderTriggers = List[List[TriggerObject]]
+
+# The number of rows to leave between the start of rows of the next unit boards.
+NEXT_ROW_SPACING = 4
 
 # Unit constant for a Forage Bush, which is an "Other" object not yet
 # added to the library.
@@ -80,6 +95,46 @@ def _generate_game_board(
                     rotation=d.facing,
                 )
     return board
+
+
+def _generate_next_units(
+    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space: float
+) -> List[NextBoard]:
+    """Returns the boards used for displaying the next Tetrominos."""
+    center_x = mmgr.map_width / 2.0 + 0.5
+    center_y = mmgr.map_height / 2.0 + 0.5
+    theta = 0.25 * math.pi
+
+    start_x = center_x - 0.5 * space * (cols - 1)
+    start_y = center_y - 0.75 * space * (rows - 1)
+    rotation = 0.75 * math.pi
+    start_row = rows // 2 + 1
+    next_boards = []
+    for row in (
+        start_row,
+        start_row + NEXT_ROW_SPACING,
+        start_row + 2 * NEXT_ROW_SPACING,
+    ):
+        board = []
+        for r in (row, row + 1):
+            board_row = []
+            for c in range(cols + 3, cols + 7):
+                x0 = start_x + c * space - center_x
+                y0 = start_y + r * space - center_y
+                x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
+                y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
+                board_row.append(
+                    umgr.add_unit(
+                        player=Player.ONE,
+                        unit_const=Unit.INVISIBLE_OBJECT,
+                        x=x,
+                        y=y,
+                        rotation=rotation,
+                    )
+                )
+            board.append(board_row)
+        next_boards.append(board)
+    return next_boards
 
 
 def _declare_game_over_objective(tmgr: TMgr) -> TriggerObject:
@@ -227,14 +282,25 @@ def _declare_render_triggers(
             f"Render ({r}, {c}), {str(d)}, {str(t)}", enabled=False
         )
         # for r in range(rows // 2, rows // 2 + 1)  # Tests one row
-        for r in range(rows // 2, rows // 2 + 3)  # Tests 3 rows
-        # for r in range(rows // 2, rows)
+        # for r in range(rows // 2, rows // 2 + 3)  # Tests 3 rows
+        for r in range(rows // 2, rows)
         # for c in range(cols // 2 - 1, cols // 2)  # Tests 1 column
         for c in range(cols)
         # for d in [Direction.U]  # Tests 1 direction
         for d in list(Direction)
         for t in range(Tetromino.num() + 1)
     }
+
+
+def _declare_render_next_triggers(tmgr: TMgr) -> NextRenderTriggers:
+    """Returns the triggers for rendering the next Tetromino boards."""
+    return [
+        [
+            tmgr.add_trigger(f"Render next {next_index} {t}", enabled=False)
+            for t in list(Tetromino)
+        ]
+        for next_index in (0, 1, 2)
+    ]
 
 
 class TetrisData:
@@ -277,6 +343,8 @@ class TetrisData:
             mmgr, umgr, rows, cols, visible, space
         )
 
+        self._next_units = _generate_next_units(mmgr, umgr, rows, cols, space)
+
         tmgr.add_trigger("-- Init --", enabled=False)
         self._init_scenario = tmgr.add_trigger("Init Scenario")
 
@@ -304,7 +372,7 @@ class TetrisData:
         self._shuffle = tmgr.add_trigger("Activate Shuffle", enabled=False)
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
-        # TODO render next
+        self._render_next_triggers = _declare_render_next_triggers(tmgr)
         # TODO render hold
         self._game_over = tmgr.add_trigger("Game Over", enabled=False)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
@@ -427,3 +495,13 @@ class TetrisData:
         game loop.
         """
         return self._begin_game_end
+
+    @property
+    def next_units(self) -> List[NextBoard]:
+        """Returns a list of 3 render boards for showing the next Tetrominos."""
+        return self._next_units
+
+    @property
+    def render_next_triggers(self) -> NextRenderTriggers:
+        """Returns the triggers for rendering the next Tetromino boards."""
+        return self._render_next_triggers

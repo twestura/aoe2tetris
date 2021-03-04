@@ -1,25 +1,27 @@
 """Represents the pieces/shapes in a game of Tetris."""
 
 
+from __future__ import annotations
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
+from AoE2ScenarioParser.objects.unit_obj import UnitObject
 from direction import Direction
 from rotation import Rotation
 from enum import Enum
 from index import Index
-from typing import Set
+from typing import List, Set
 
 
 class Tetromino(Enum):
     """A piece in a game of Tetris."""
 
-    I = 5  # noqa: E741
-    J = 7
     L = 1
-    O = 4  # noqa: E741
-    S = 3
-    T = 6
     Z = 2
+    S = 3
+    O = 4  # noqa: E741
+    I = 5  # noqa: E741
+    T = 6
+    J = 7
 
     def __str__(self):
         return _STR[self]
@@ -53,10 +55,46 @@ class Tetromino(Enum):
                 indices = {index.rotate(Rotation.CCW) for index in indices}
         return {index + center for index in indices}
 
+    def board_unit_ids(self, unit_board: List[List[UnitObject]]) -> Set[int]:
+        """
+        Returns the reference ids of units from the `unit_board` that are
+        represented by this Tetromino.
+        """
+        return {
+            unit_board[index.row][index.col].reference_id
+            for index in self.indices(center=Index(1, 1))
+        }
+
     @staticmethod
     def num() -> int:
         """Returns the number of Tetrominos."""
         return len(list(Tetromino))
+
+    @staticmethod
+    def from_int(t: int) -> Tetromino:
+        """
+        Returns the `Tetromino` corresponding to `int` `t`.
+
+        Parameters:
+            t: The `int` to convert.
+        Raises:
+            ValueError if `t` does not represent a `Tetromino`.
+        """
+        if t == Tetromino.L.value:
+            return Tetromino.L
+        if t == Tetromino.Z.value:
+            return Tetromino.Z
+        if t == Tetromino.S.value:
+            return Tetromino.S
+        if t == Tetromino.O.value:
+            return Tetromino.O
+        if t == Tetromino.I.value:
+            return Tetromino.I
+        if t == Tetromino.T.value:
+            return Tetromino.T
+        if t == Tetromino.J.value:
+            return Tetromino.J
+        raise ValueError(f"{t} does not represent a Tetromino")
 
     @staticmethod
     def init_seq() -> int:
