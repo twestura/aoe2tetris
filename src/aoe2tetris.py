@@ -44,7 +44,8 @@ NUM_VISIBLE = 20  # The number of visible rows in the Board.
 INIT_ROW = 19  # One row above the first visible row.
 INIT_COL = 4  # Left-center column.
 
-SQUARE_SPACE = 1.0  # The amount of space between Tetris game squares.
+SQUARE_SPACE_V = 1.2  # The amount of vertical space between rows.
+SQUARE_SPACE_H = 0.9  # The amount of horizontal space between columns.
 
 BUILDING_X = 2  # The x-coordinate to place "select all hotkey" buildings.
 BUILDING_Y = 2  # The y-coordinate to place "select all hotkey" buildings.
@@ -484,7 +485,8 @@ def build(args):
         TETRIS_ROWS,
         TETRIS_COLS,
         NUM_VISIBLE,
-        SQUARE_SPACE,
+        SQUARE_SPACE_V,
+        SQUARE_SPACE_H,
     )
     impl_triggers(variables, tdata)
 

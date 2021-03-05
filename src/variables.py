@@ -4,13 +4,13 @@ from AoE2ScenarioParser.objects.triggers_obj import TriggerObject as TMgr
 from AoE2ScenarioParser.objects.variable_obj import VariableObject as Var
 
 # The variable id of the player's score.
-SCORE_ID = 1
+SCORE_ID = 0
 
 # The variable id of the player's level.
-LEVEL_ID = 2
+LEVEL_ID = 1
 
 # The variable id of the number of lines the player has cleared.
-LINES_ID = 3
+LINES_ID = 2
 
 
 class ScnVar:

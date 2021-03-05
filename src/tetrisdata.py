@@ -21,7 +21,7 @@ from tetromino import Tetromino
 from variables import Variables
 
 # A `2 x 4` board of units.
-NextBoard = List[List[UnitObject]]
+DisplayBoard = List[List[UnitObject]]
 
 # The outer list consists of 3 three lists, with the list at index `k`
 # containing the render update triggers for the Tetromino at
@@ -58,33 +58,55 @@ def _place_invisible_objects(umgr: UMgr):
         )
 
 
+def _rotate_unit_coordinates(
+    mmgr: MMgr,
+    rows: int,
+    cols: int,
+    space_v: float,
+    space_h: float,
+    r: int,
+    c: int,
+) -> Tuple[int, int]:
+    """
+    Returns the `(x, y)` coordinate on the map where the unit in row `r` and
+    column `c` is positioned.
+    """
+    center_x = mmgr.map_width / 2.0 + 0.5
+    center_y = mmgr.map_height / 2.0 + 0.5
+    # Radians clockwise with 0 towards the northeast (along the x-axis).
+    theta = 0.25 * math.pi
+    start_x = center_x - 0.5 * space_h * (cols - 1)
+    start_y = center_y - 0.75 * space_v * (rows - 1)
+    # rotation by theta
+    # [[cos(theta) -sin(theta)] [[x]  = [[x cos(theta) - y sin(theta)]
+    #  [sin(theta) cos(theta)]]  [y]]    [x sin(theta) + y cos(theta)]]
+    x0 = start_x + c * space_h - center_x
+    y0 = start_y + r * space_v - center_y
+    x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
+    y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
+    return (x, y)
+
+
 def _generate_game_board(
-    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, visible: int, space: float
+    mmgr: MMgr,
+    umgr: UMgr,
+    rows: int,
+    cols: int,
+    visible: int,
+    space_v: float,
+    space_h: float,
 ) -> Board:
     """
     Places units in the middle of the map to use as the game board.
 
     Returns a 2D array of the units in the middle of the map.
     """
-    center_x = mmgr.map_width / 2.0 + 0.5
-    center_y = mmgr.map_height / 2.0 + 0.5
-    # Radians clockwise with 0 towards the northeast (along the x-axis).
-    theta = 0.25 * math.pi
-
-    start_x = center_x - 0.5 * space * (cols - 1)
-    start_y = center_y - 0.75 * space * (rows - 1)
-
-    # rotation by theta
-    # [[cos(theta) -sin(theta)] [[x]  = [[x cos(theta) - y sin(theta)]
-    #  [sin(theta) cos(theta)]]  [y]]    [x sin(theta) + y cos(theta)]]
-
     board = Board(rows, cols, visible)
     for r in range(rows // 2, rows):
         for c in range(cols):
-            x0 = start_x + c * space - center_x
-            y0 = start_y + r * space - center_y
-            x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
-            y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
+            x, y = _rotate_unit_coordinates(
+                mmgr, rows, cols, space_v, space_h, r, c
+            )
             for d in DIRECTIONS:
                 assert board[Index(r, c)] is not None
                 board[Index(r, c)][d] = umgr.add_unit(  # type: ignore
@@ -98,16 +120,9 @@ def _generate_game_board(
 
 
 def _generate_next_units(
-    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space: float
-) -> List[NextBoard]:
+    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space_v: float, space_h: float
+) -> List[DisplayBoard]:
     """Returns the boards used for displaying the next Tetrominos."""
-    center_x = mmgr.map_width / 2.0 + 0.5
-    center_y = mmgr.map_height / 2.0 + 0.5
-    theta = 0.25 * math.pi
-
-    start_x = center_x - 0.5 * space * (cols - 1)
-    start_y = center_y - 0.75 * space * (rows - 1)
-    rotation = 0.75 * math.pi
     start_row = rows // 2 + 1
     next_boards = []
     for row in (
@@ -119,22 +134,47 @@ def _generate_next_units(
         for r in (row, row + 1):
             board_row = []
             for c in range(cols + 3, cols + 7):
-                x0 = start_x + c * space - center_x
-                y0 = start_y + r * space - center_y
-                x = x0 * math.cos(theta) - y0 * math.sin(theta) + center_x
-                y = x0 * math.sin(theta) + y0 * math.cos(theta) + center_y
+                x, y = _rotate_unit_coordinates(
+                    mmgr, rows, cols, space_v, space_h, r, c
+                )
                 board_row.append(
                     umgr.add_unit(
                         player=Player.ONE,
                         unit_const=Unit.INVISIBLE_OBJECT,
                         x=x,
                         y=y,
-                        rotation=rotation,
+                        rotation=Direction.U.facing,
                     )
                 )
             board.append(board_row)
         next_boards.append(board)
     return next_boards
+
+
+def _generate_hold_units(
+    mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space_v: float, space_h: float
+) -> DisplayBoard:
+    """Returns the board used for displaying the hold Tetromino"""
+    start_row = rows // 2 + 1
+    start_col = -7
+    board = []
+    for r in (start_row, start_row + 1):
+        row = []
+        for c in range(start_col, start_col + 4):
+            x, y = _rotate_unit_coordinates(
+                mmgr, rows, cols, space_v, space_h, r, c
+            )
+            row.append(
+                umgr.add_unit(
+                    player=Player.ONE,
+                    unit_const=Unit.INVISIBLE_OBJECT,
+                    x=x,
+                    y=y,
+                    rotation=Direction.U.facing,
+                )
+            )
+        board.append(row)
+    return board
 
 
 def _declare_game_over_objective(tmgr: TMgr) -> TriggerObject:
@@ -319,7 +359,8 @@ class TetrisData:
         rows: int,
         cols: int,
         visible: int,
-        space: float,
+        space_v: float,
+        space_h: float,
     ):
         """
         Initializes a `TetrisData` object writing to the input managers.
@@ -340,10 +381,14 @@ class TetrisData:
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(umgr, building_x, building_y)
         self._board = _generate_game_board(
-            mmgr, umgr, rows, cols, visible, space
+            mmgr, umgr, rows, cols, visible, space_v, space_h
         )
-
-        self._next_units = _generate_next_units(mmgr, umgr, rows, cols, space)
+        self._next_units = _generate_next_units(
+            mmgr, umgr, rows, cols, space_v, space_h
+        )
+        self._hold_units = _generate_hold_units(
+            mmgr, umgr, rows, cols, space_v, space_h
+        )
 
         tmgr.add_trigger("-- Init --", enabled=False)
         self._init_scenario = tmgr.add_trigger("Init Scenario")
@@ -497,7 +542,7 @@ class TetrisData:
         return self._begin_game_end
 
     @property
-    def next_units(self) -> List[NextBoard]:
+    def next_units(self) -> List[DisplayBoard]:
         """Returns a list of 3 render boards for showing the next Tetrominos."""
         return self._next_units
 
@@ -505,3 +550,8 @@ class TetrisData:
     def render_next_triggers(self) -> NextRenderTriggers:
         """Returns the triggers for rendering the next Tetromino boards."""
         return self._render_next_triggers
+
+    @property
+    def hold_units(self) -> DisplayBoard:
+        """Returns the units for rendering the hold Tetromino."""
+        return self._hold_units
