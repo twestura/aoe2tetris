@@ -1,10 +1,5 @@
 /// xs file for Aoe2 Tetris.
 ///
-/// This script uses an array to store the state of a game of Tetris.
-/// The indicies in this array are referred to as xs-indices throughout
-/// this documentation.
-/// This array must be initialized using the `initXsArray` function
-/// immediately when the Tetris scenario begins.
 /// Maybe one day xs will have structs. And monads. :)
 
 // FE documentation:
@@ -14,89 +9,32 @@
 // https://eso-community.net/viewtopic.php?p=436182
 
 // There is array functionality that isn't listed in the FE documentation.
-// There are five types: bool, int, float, string, and vector
+// There are five types: bool, float, int, string, and Vector.
+// ```
 // xsArraySetType(arrayID, index, value)
 // xsArrayGetType(arrayID, index)
 // xsArrayGetSize(arrayID)
+// ```
 
-
-/// The id of the variable that holds the xs array.
-///
-/// This implementation of arrays in xs script always assigns 0 as the id of
-/// the first created array. But to avoid relying on this behavior, the array
-/// id is saved in a scenario variable. The id is accessed in order to obtain
-/// the array id using the `_getXsArrayId` function.
-/// But more typically the `_getState` and `_setState` functions should be
-/// preferred to using the id directly.
-const int XS_ARRAY_VAR_ID = 0;
-
-/// The xs-index of the game board array.
-const int BOARD_INDEX = 0;
-
-/// The xs-index of the board state array.
-const int UPDATE_INDEX = 1;
-
-/// The xs-index of the active Tetromino's row.
-const int ROW_INDEX = 2;
-
-/// The xs-index of the active Tetromino's col.
-const int COL_INDEX = 3;
-
-/// The xs-index of the active Tetromino's facing direction.
-const int DIR_INDEX = 4;
-
-/// The xs-index of the length 14-Tetromino sequence.
-const int TETROMINO_SEQUENCE_INDEX = 5;
-
-/// The xs-index of the current index of the Tetromino sequence.
-const int TETROMINO_SEQUENCE_INDEX_INDEX = 6;
-
-/// The xs-index of the selected hotkey and action to perform.
-const int SELECTED_INDEX = 7;
-
-/// The xs-index of the Tetromino offset arrays.
-const int TETROMINO_OFFSETS_INDEX = 8;
-
-/// The xs-index of the I Tetromino rotation offsets.
-const int ROTATE_I_INDEX = 9;
-
-/// The xs-index of the J, L, S, T, and Z Tetromino rotation offsets.
-const int ROTATE_X_INDEX = 10;
-
-/// The xs-index of the flag to determine whether the 2nd xs sequence
-/// should be suffled at the end of a game loop.
-/// The variable is `SHUFFLE` when it should be shuffled and `NOSHUFFLE`
-/// when it should not be shuffled.
-const int SEQ_SHUFFLE_INDEX = 11;
-
-/// The xs-index of the flag to indicate whether the previous score action
-/// qualifies for a difficulty bonus.
-const int DIFFICULT_INDEX = 12;
-
-/// The xs-index of the flag to indicate whether the game is playing or over.
-const int GAME_OVER_OR_PLAYING_INDEX = 13;
-
-/// The xs-index of the flag for whether or not to render the next board.
-const int CAN_RENDER_NEXT_INDEX = 14;
-
-/// The number of elements in the xs array.
-const int NUM_XS_ARRAY_ELEMENTS = 15;
+// =============================================================================
+// Constant Globals
+// =============================================================================
 
 /// The id of the variable that holds the player's score.
-const int SCORE_ID = 1;
+const int SCORE_ID = 0;
 
 /// The initial player score.
 const int SCORE_INIT = 0;
 
 /// The id of the variable that holds the player's level.
-const int LEVEL_ID = 2;
+const int LEVEL_ID = 1;
 /// The initial level.
 
 /// The initial starting level without clearing any rows.
 const int LEVEL_INIT = 1;
 
 /// The id of the variable that holds the number of cleared lines.
-const int LINES_ID = 3;
+const int LINES_ID = 2;
 
 /// The initial number of cleared lines.
 const int LINES_INIT = 0;
@@ -174,32 +112,75 @@ const int SOFT_DROP_MULTIPLIER = 1;
 /// the player's current level multiplied by `HARD_DROP_MULTIPLIER`.
 const int HARD_DROP_MULTIPLIER = 2;
 
-/// Indicates the 2nd Tetromino sequence does not need to be shuffled.
-const int NOSHUFFLE = 0;
-
-/// Indicates the 2nd Tetromino sequence needs to be shuffled.
-const int SHUFFLE = 1;
-
-/// Indicates the previous score does not qualify for a difficulty bonus.
-const int NOT_DIFFICULT = 0;
-
-/// Indicates the previous score qualifies for a difficulty bonus.
-const int DIFFICULT = 1;
-
 /// The number of lines to clear in order to level up.
 const int LINES_PER_LEVEL = 10;
 
-/// Represents the game-over state.
-const int GAME_OVER = 0;
+// =============================================================================
+// Mutable Globals
+// =============================================================================
 
-/// Represents the game playing state.
-const int GAME_PLAYING = 1;
+/// The array id of the game board array.
+int boardArrayId = -1;
 
-/// Represents that the next boards do not need to be updated.
-const int NO_RENDER_NEXT = 0;
+/// The array id of the update array.
+int updateArrayId = -1;
 
-/// Represents that the next boards need to be updated.
-const int RENDER_NEXT = 1;
+/// The array id of the tetromino offsets array.
+int tetrominoOffsetsId = -1;
+
+/// The array id of the I tetromino rotation offsets.
+int rotateIId = -1;
+
+/// The array id of the J, L, S, T, and Z tetromino rotation offsets.
+int rotateXId = -1;
+
+/// The row of the active Tetromino's center.
+int activeRow = PLACE_ROW;
+
+/// The column of the active Tetromino's center.
+int activeCol = PLACE_COL;
+
+/// The facing direction of the active Tetromino.
+int activeFacing = PLACE_DIR;
+
+/// The array id containing the Tetromino sequence.
+int tetrominoSeqId = -1;
+
+/// The index of the current active Tetromino in the Tetromino sequence.
+/// In `0..NUM_TETROMINOS`.
+int tetrominoSeqIndex = 0;
+
+/// The selected hotkey and action to perform on the current game tick.
+int selected = NO_ACTION;
+
+/// `true` when the second half of the Tetromino sequence should be shuffled,
+/// on the current game tick, `false` otherwise.
+bool canShuffleSecondSeq = false;
+
+/// `true` if the previous score action qualifies for a difficulty bonus,
+/// `false` otherwise.
+bool difficult = false;
+
+/// `true` if the game is over, `false` if the game is ongoing.
+bool gameOver = false;
+
+/// `true` to render the next boards, `false` otherwise.
+bool renderNext = false;
+
+/// `true` if the active tetromino may be held, `false` if not.
+bool isHoldLegal = false;
+
+/// `true` if the hold board should be re-rendered on the current game tick,
+/// `false` if not.
+bool renderHold = false;
+
+/// Equals the int value of the held tetromino if a tetromino is held,
+/// equals `0` if no tetromino is held.
+int heldTetromino = 0;
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
 
 /// Writes a chat message containing the values of the array.
 ///
@@ -310,42 +291,6 @@ int _rotateDirection(int d = 0, int r = 0) {
 }
 
 // =============================================================================
-// xs State Array
-// =============================================================================
-
-/// Returns the array id of the xs state array.
-int _getXsArrayId() {
-    return (xsTriggerVariable(XS_ARRAY_VAR_ID));
-}
-
-/// Returns the value at index `index` of the xs-state array.
-///
-/// Parameters:
-///     index: The array index from which to retreive a value.
-///         Requires `0 <= index < NUM_XS_ARRAY_ELEMENTS`.
-int _getState(int index = 0) {
-    int arrayId = _getXsArrayId();
-    return (xsArrayGetInt(arrayId, index));
-}
-
-/// Sets the state element at index `index` to `value`.
-///
-/// Parameters:
-///     index: The array index from which to retreive a value.
-///         Requires `0 <= index < NUM_XS_ARRAY_ELEMENTS`.
-///     value: The value to assign in the state array.
-void _setState(int index = 0, int value = 0) {
-    int arrayId = _getXsArrayId();
-    xsArraySetInt(arrayId, index, value);
-
-}
-
-/// Chats the xs state array.
-void _chatStateArray() {
-    _chatArray(_getXsArrayId());
-}
-
-// =============================================================================
 // Board Array
 // =============================================================================
 
@@ -378,7 +323,7 @@ int _initBoardRow(int r = 0) {
 }
 
 /// Initializes an empty game board and set the id of this board's array
-/// to the xs-index `BOARD_INDEX`.
+/// to `boardArrayId`.
 /// A game board consists of nested arrays in order to hold the piece and facing
 /// of every tile in the game.
 ///
@@ -393,13 +338,9 @@ int _initBoardRow(int r = 0) {
 ///
 /// Intuitively, board[row][column][direction] is `0` when empty or an in
 /// in `1..=7` if there is a Tetromino there.
-///
-/// Parameters:
-///     boardIndex: Either `BOARD_INDEX` or `UPDATE_INDEX`. Controls which board
-///         is initialized.
 void _initBoard() {
     int boardId = xsArrayCreateInt(TETRIS_ROWS, 0, "Outer Board Array");
-    _setState(BOARD_INDEX, boardId);
+    boardArrayId = boardId;
     for (r = 0; < TETRIS_ROWS) {
         int rowId = _initBoardRow(r);
         xsArraySetInt(boardId, r, rowId);
@@ -413,8 +354,7 @@ void _initBoard() {
 ///     c: The column index, in `0..TETRIS_COLS`.
 ///     d: The facing direction, in `0..NUM_DIRS`.
 int _getBoardValue(int r = 0, int c = 0, int d = 0) {
-    int boardId = _getState(BOARD_INDEX);
-    int rowId = xsArrayGetInt(boardId, r);
+    int rowId = xsArrayGetInt(boardArrayId, r);
     int tileId = xsArrayGetInt(rowId, c);
     return (xsArrayGetInt(tileId, d));
 }
@@ -427,8 +367,7 @@ int _getBoardValue(int r = 0, int c = 0, int d = 0) {
 ///     d: The facing direction, in `0..NUM_DIRS`.
 ///     t: The value to set, in `0..=7`.
 void _setBoardValue(int r = 0, int c = 0, int d = 0, int t = 0) {
-    int boardId = _getState(BOARD_INDEX);
-    int rowId = xsArrayGetInt(boardId, r);
+    int rowId = xsArrayGetInt(boardArrayId, r);
     int tileId = xsArrayGetInt(rowId, c);
     xsArraySetInt(tileId, d, t);
 }
@@ -547,10 +486,10 @@ int _initUpdateRow(int r = 0) {
 /// When a new game is launched, all entries of `Update` are set to `true`.
 void _initUpdate() {
     int updateId = xsArrayCreateInt(TETRIS_ROWS, 0, "Outer Update Array");
-    _setState(UPDATE_INDEX, updateId);
+    updateArrayId = updateId;
     for (r = 0; < TETRIS_ROWS) {
         int rowId = _initUpdateRow(r);
-        xsArraySetInt(updateId, r, rowId);
+        xsArraySetInt(updateArrayId, r, rowId);
     }
 }
 
@@ -562,8 +501,7 @@ void _initUpdate() {
 ///     d: The facing direction, in `0..NUM_DIRS`.
 ///     t: The Tetromino, in `0..=NUM_TETROMINOS`.
 bool _getUpdateValue(int r = 0, int c = 0, int d = 0, int t = 0) {
-    int updateId = _getState(UPDATE_INDEX);
-    int rowId = xsArrayGetInt(updateId, r);
+    int rowId = xsArrayGetInt(updateArrayId, r);
     int tileId = xsArrayGetInt(rowId, c);
     int dirId = xsArrayGetInt(tileId, d);
     return (xsArrayGetBool(dirId, t));
@@ -580,8 +518,7 @@ bool _getUpdateValue(int r = 0, int c = 0, int d = 0, int t = 0) {
 void _setUpdateValue(
     int r = 0, int c = 0, int d = 0, int t = 0, bool b = false
 ) {
-    int updateId = _getState(UPDATE_INDEX);
-    int rowId = xsArrayGetInt(updateId, r);
+    int rowId = xsArrayGetInt(updateArrayId, r);
     int tileId = xsArrayGetInt(rowId, c);
     int dirId = xsArrayGetInt(tileId, d);
     xsArraySetBool(dirId, t, b);
@@ -684,13 +621,12 @@ void _moveRowsDown(int row = 0) {
 /// Note this funciton does not shuffle the sequences. Shuffling is performed
 /// by the scenario triggers.
 void _initSequence() {
-    // Creates the array and assigns it to the xs-state.
-    int seqId = xsArrayCreateInt(2 * NUM_TETROMINOS, 0, "Tetromino Sequence");
-    _setState(TETROMINO_SEQUENCE_INDEX, seqId);
-    // Assigns initial values to the array.
+    tetrominoSeqId = xsArrayCreateInt(
+        2 * NUM_TETROMINOS, 0, "Tetromino Sequence"
+    );
     for (k = 0; < NUM_TETROMINOS) {
-        xsArraySetInt(seqId, k, k + 1);
-        xsArraySetInt(seqId, k + NUM_TETROMINOS, k + 1);
+        xsArraySetInt(tetrominoSeqId, k, k + 1);
+        xsArraySetInt(tetrominoSeqId, k + NUM_TETROMINOS, k + 1);
     }
 }
 
@@ -700,8 +636,7 @@ void _initSequence() {
 ///     index: The index from which to retrieve a value.
 ///         Requires `0 <= index < 2 * NUM_TETROMINOS`.
 int _getSequence(int index = 0) {
-    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
-    return (xsArrayGetInt(seqId, index));
+    return (xsArrayGetInt(tetrominoSeqId, index));
 }
 
 /// Returns the value at `index` of the Tetromino sequence to `value`.
@@ -711,8 +646,7 @@ int _getSequence(int index = 0) {
 ///         Requires `0 <= index < 2 * NUM_TETROMINOS`.
 ///     value: The value to assign in the sequence.
 void _setSequence(int index = 0, int value = 0) {
-    int seqId = _getState(TETROMINO_SEQUENCE_INDEX);
-    xsArraySetInt(seqId, index, value);
+    xsArraySetInt(tetrominoSeqId, index, value);
 }
 
 /// Swaps the values of the Tetromino sequence at the given indices.
@@ -733,9 +667,9 @@ void swapSeqValues(int seqNum = 0, int i = 0, int j = 0) {
 }
 
 /// Returns `true` if the second Tetromino sequence should be randomized,
-/// False otherwise.
+/// `false` otherwise.
 bool canGenerateSecondSequence() {
-    return (_getState(SEQ_SHUFFLE_INDEX) == SHUFFLE);
+    return (canShuffleSecondSeq);
 }
 
 // =============================================================================
@@ -744,23 +678,7 @@ bool canGenerateSecondSequence() {
 
 /// Returns the value at the active index of the Tetromino sequence.
 int _activeTetromino() {
-    int index = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
-    return (_getSequence(index));
-}
-
-/// Returns the row coordinate of the active Tetromino.
-int _activeRow() {
-    return (_getState(ROW_INDEX));
-}
-
-/// Returns the column coordinate of the active Tetromino.
-int _activeCol() {
-    return (_getState(COL_INDEX));
-}
-
-/// Returns the facing direction of the active Tetromino.
-int _activeFacing() {
-    return (_getState(DIR_INDEX));
+    return (_getSequence(tetrominoSeqIndex));
 }
 
 /// Writes a debug chat message to display position information for the
@@ -768,11 +686,11 @@ int _activeFacing() {
 void _chatPositionInfo() {
     xsChatData(
         "Active: ("
-        + _activeRow()
+        + activeRow
         + ", "
-        + _activeCol()
+        + activeCol
         + ") "
-        + _activeFacing()
+        + activeFacing
         + " - "
         + _activeTetromino()
     );
@@ -786,28 +704,27 @@ void _chatPositionInfo() {
 // Each offset array is an array of vectors, where the first two coordinates of
 // each vector are set to the row and column offsets. The 3rd coordinate is
 // unused.
-// xsState[TETROMINO_OFFSETS_INDEX] = [offsetsL, offsetsZ, ... offsetsJ];
+// `offsets = [offsetsL, offsetsZ, ... offsetsJ];`
 
 /// Returns the array id of the offsets for Tetromino t.
 ///
 /// Parameters:
 ///     t: The Tetromion, in `1..=7`.
 int _getOffsets(int t = 0) {
-    int containerId = _getState(TETROMINO_OFFSETS_INDEX);
-    int index = t - 1;
-    return (xsArrayGetInt(containerId, index));
+    return (xsArrayGetInt(tetrominoOffsetsId, t - 1));
 }
 
 /// Initalizes the Tetromino offset arrays.
 void _initOffsetArrays() {
-    int arrayId = xsArrayCreateInt(NUM_TETROMINOS, 0, "Tetromino Offset Array");
-    _setState(TETROMINO_OFFSETS_INDEX, arrayId);
+    tetrominoOffsetsId = xsArrayCreateInt(
+        NUM_TETROMINOS, 0, "Tetromino Offset Array"
+    );
     for (t = 1; <= NUM_TETROMINOS) {
         int offsetArrayId = xsArrayCreateVector(
             NUM_TILES, Vector(0.0, 0.0, 0.0), "Offset Array " + t
         );
         int index = t - 1;
-        xsArraySetInt(arrayId, index, offsetArrayId);
+        xsArraySetInt(tetrominoOffsetsId, index, offsetArrayId);
     }
 
     // Sets the I offsets.
@@ -855,10 +772,9 @@ void _initOffsetArrays() {
 
 /// Chats the contents of the offset arrays for debugging.
 void chatOffsetArrays() {
-    int offsetArrayContainerId = _getState(TETROMINO_OFFSETS_INDEX);
     for (t = 0; < NUM_TETROMINOS) {
         xsChatData("Array " + t);
-        int arrayId = xsArrayGetInt(offsetArrayContainerId, t);
+        int arrayId = xsArrayGetInt(tetrominoOffsetsId, t);
         for (j = 0; < NUM_TILES) {
             Vector v = xsArrayGetVector(arrayId, j);
             xsChatData("(" + t + ", " + j + "): " + _vecStr(v));
@@ -873,7 +789,7 @@ void chatOffsetArrays() {
 /// Initializes the rotation array for the I Tetromino.
 void _initRotationI() {
     int rotationHeader = xsArrayCreateInt(NUM_DIRS, 0, "Rotate I Offsets");
-    _setState(ROTATE_I_INDEX, rotationHeader);
+    rotateIId = rotationHeader;
 
     int arrayU = xsArrayCreateInt(2, 0, "Rotate I Up");
     xsArraySetInt(rotationHeader, UP, arrayU);
@@ -971,7 +887,7 @@ void _initRotationI() {
 /// Initializes the rotation arrays for the J, L, S, T, and Z Tetrominos.
 void _initRotationX() {
     int rotationHeader = xsArrayCreateInt(NUM_DIRS, 0, "Rotate X Offsets");
-    _setState(ROTATE_X_INDEX, rotationHeader);
+    rotateXId = rotationHeader;
 
     int arrayU = xsArrayCreateInt(2, 0, "Rotate X Up");
     xsArraySetInt(rotationHeader, UP, arrayU);
@@ -1067,9 +983,9 @@ void _initRotationX() {
 int _getRotationTests(int t = 0, int d = 0, int r = 0) {
     int arrayHeaderId = 0;
     if (t == I) {
-        arrayHeaderId = _getState(ROTATE_I_INDEX);
+        arrayHeaderId = rotateIId;
     } else {
-        arrayHeaderId = _getState(ROTATE_X_INDEX);
+        arrayHeaderId = rotateXId;
     }
     int directionArrayId = xsArrayGetInt(arrayHeaderId, d);
     return (xsArrayGetInt(directionArrayId, r));
@@ -1089,8 +1005,8 @@ void _initRotationArrays() {
 ///     d: The target facing direction of the Tetromino.
 ///     t: The test index, in `0..=4`.
 bool _testOneRotation(int arrayId = 0, int d = 0, int t = 0) {
-    int row = _activeRow();
-    int col = _activeCol();
+    int row = activeRow;
+    int col = activeCol;
     int offsetArrayId = _getOffsets(_activeTetromino());
     Vector testOffset = xsArrayGetVector(arrayId, t);
     int dr = xsVectorGetX(testOffset);
@@ -1115,7 +1031,7 @@ bool _testOneRotation(int arrayId = 0, int d = 0, int t = 0) {
 ///     r: The direction in which to rotate the active Tetromino.
 ///         One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
 int _testRotations(int r = 0) {
-    int d = _activeFacing();
+    int d = activeFacing;
     int arrayId = _getRotationTests(_activeTetromino(), d, r);
     int newDir = _rotateDirection(d, r);
     for (t = 0; < NUM_ROTATION_TESTS) {
@@ -1133,8 +1049,6 @@ int _testRotations(int r = 0) {
 /// Initializes the array of xs data and stores it's id in the variable
 /// with id `XS_ARRAY_VAR_ID`.
 void initXsArray() {
-    int arrayId = xsArrayCreateInt(NUM_XS_ARRAY_ELEMENTS, 0, "xs State Array");
-    xsSetTriggerVariable(XS_ARRAY_VAR_ID, arrayId);
     _initBoard();
     _initUpdate();
     _initSequence();
@@ -1158,25 +1072,24 @@ void beginGame() {
     _initGameVariables();
     _clearBoard();
     _clearUpdate();
-    _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
-    _setState(DIFFICULT_INDEX, NOT_DIFFICULT);
-    _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_PLAYING);
-    _setState(CAN_RENDER_NEXT_INDEX, RENDER_NEXT);
+    tetrominoSeqIndex = 0;
+    difficult = false;
+    gameOver = false;
+    renderNext = true;
+    renderHold = true;
+    isHoldLegal = true;
+    heldTetromino = 0;
 }
 
 /// Initializes the state necessary for placing a Tetromino on the board.
 /// Requries the update board already is cleared and the Tetromino sequences
 /// are already generated.
 void beginGameMid() {
-    int row = PLACE_ROW + 1;
-    int col = PLACE_COL;
-    int dir = PLACE_DIR;
-
     /// There is always room to place the starting Tetromino on a new board.
     /// No need to check if the starting piece and initial drop are legal.
-    _setState(ROW_INDEX, row);
-    _setState(COL_INDEX, col);
-    _setState(DIR_INDEX, dir);
+    activeRow = PLACE_ROW + 1;
+    activeCol = PLACE_COL;
+    activeFacing = PLACE_DIR;
 
     // For each coordinate in the offset plus the active position, and
     // direction, sets the Invisible Object replacement to `false` and the
@@ -1184,10 +1097,10 @@ void beginGameMid() {
     int offsetArrayId = _getOffsets(_activeTetromino());
     for (k = 0; < NUM_TILES) {
         Vector v = xsArrayGetVector(offsetArrayId, k);
-        int r = xsVectorGetX(v) + row;
-        int c = xsVectorGetY(v) + col;
-        _setUpdateValue(r, c, dir, 0, false);
-        _setUpdateValue(r, c, dir, _activeTetromino(), true);
+        int r = xsVectorGetX(v) + activeRow;
+        int c = xsVectorGetY(v) + activeCol;
+        _setUpdateValue(r, c, activeFacing, 0, false);
+        _setUpdateValue(r, c, activeFacing, _activeTetromino(), true);
     }
 }
 
@@ -1202,13 +1115,7 @@ void beginGameMid() {
 ///         Action numbers are the same as those in `action.py`.
 ///         Requires `action` is in `0..=8`.
 void selectBuilding(int action = 0) {
-    _setState(SELECTED_INDEX, action);
-}
-
-/// Returns the int representing the hotkey action of the
-/// selected building, or `0` if no building is selected.
-int _getSelectedBuilding() {
-    return (_getState(SELECTED_INDEX));
+    selected = action;
 }
 
 /// Initializes the game state at the start of each game loop.
@@ -1218,19 +1125,20 @@ int _getSelectedBuilding() {
 /// Clears the render update board.
 void initGameLoop() {
     selectBuilding(NO_ACTION);
-    _setState(SEQ_SHUFFLE_INDEX, NOSHUFFLE);
-    _setState(CAN_RENDER_NEXT_INDEX, NO_RENDER_NEXT);
+    canShuffleSecondSeq = false;
+    renderNext = false;
+    renderHold = false;
     _setAllUpdate(false);
 }
 
 /// Returns `true` if the selected action is to start a new game.
 bool canStartNewGame() {
-    return (_getSelectedBuilding() == NEW_GAME);
+    return (selected == NEW_GAME);
 }
 
 /// Returns `true` if the game is over, `false` if the game is ongoing.
 bool isGameOver() {
-    return (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER);
+    return (gameOver);
 }
 
 /// Returns `true` if the active Tetromino can be translated by the offsets.
@@ -1239,15 +1147,12 @@ bool isGameOver() {
 ///     dr: The number of rows to move, either `0` or `1`.
 ///     dc: The number of columns to move, one of `-1`, `0`, or `1`.
 bool _canTranslate(int dr = 0, int dc = 0) {
-    int row = _activeRow();
-    int col = _activeCol();
-    int d = _activeFacing();
     int offsetArrayId = _getOffsets(_activeTetromino());
     for (k = 0; < NUM_TILES) {
         Vector v = xsArrayGetVector(offsetArrayId, k);
-        Vector v2 = _rotateVector(v, d);
-        int r = xsVectorGetX(v2) + row + dr;
-        int c = xsVectorGetY(v2) + col + dc;
+        Vector v2 = _rotateVector(v, activeFacing);
+        int r = xsVectorGetX(v2) + activeRow + dr;
+        int c = xsVectorGetY(v2) + activeCol + dc;
         if (_isInBoundsAndEmpty(r, c) == false) {
             return (false);
         }
@@ -1258,27 +1163,20 @@ bool _canTranslate(int dr = 0, int dc = 0) {
 
 /// Returns `true` if the move left action is allowed.
 bool _canMoveLeft() {
-    return (
-        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
-        && _getSelectedBuilding() == MOVE_LEFT
-        && _canTranslate(0, -1));
+    return (gameOver == false && selected == MOVE_LEFT && _canTranslate(0, -1));
 }
 
 /// Returns `true` if the move right action is allowed.
 bool _canMoveRight() {
-    return (
-        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
-        && _getSelectedBuilding() == MOVE_RIGHT
-        && _canTranslate(0, 1)
-    );
+    return (gameOver == false && selected == MOVE_RIGHT && _canTranslate(0, 1));
 }
 
 /// Returns `true` if the rotate clockwise action is allowed.
 bool _canRotateClockwise() {
-    if (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER) {
+    if (gameOver) {
         return (false);
     }
-    if (_getSelectedBuilding() != ROTATE_CLOCKWISE) {
+    if (selected != ROTATE_CLOCKWISE) {
         return (false);
     }
     if (_activeTetromino() == O) {
@@ -1289,10 +1187,10 @@ bool _canRotateClockwise() {
 
 /// Returns `true` if the rotate counterclockwise action is allowed.
 bool _canRotateCounterclockwise() {
-    if (_getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_OVER) {
+    if (gameOver) {
         return (false);
     }
-    if (_getSelectedBuilding() != ROTATE_COUNTERCLOCKWISE) {
+    if (selected != ROTATE_COUNTERCLOCKWISE) {
         return (false);
     }
     if (_activeTetromino() == O) {
@@ -1303,28 +1201,17 @@ bool _canRotateCounterclockwise() {
 
 /// Returns `true` if the soft drop action is allowed.
 bool _canSoftDrop() {
-    return (
-        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
-        && _getSelectedBuilding() == SOFT_DROP
-        && _canTranslate(1, 0)
-    );
+    return (gameOver == false && selected == SOFT_DROP && _canTranslate(1, 0));
 }
 
 /// Returns `true` if the hard drop action is allowed.
 bool _canHardDrop() {
-    return (
-        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
-        && _getSelectedBuilding() == HARD_DROP
-    );
+    return (gameOver == false && selected == HARD_DROP);
 }
 
 /// Returns `true` if the hold action is allowed.
 bool _canHold() {
-    // TODO handle multiple holds without resetting
-    return (
-        _getState(GAME_OVER_OR_PLAYING_INDEX) == GAME_PLAYING
-        && _getSelectedBuilding() == HOLD
-    );
+    return (gameOver == false && selected == HOLD && isHoldLegal);
 }
 
 /// Translates the position of the active Tetromino and sets the render values
@@ -1337,31 +1224,28 @@ bool _canHold() {
 ///     dc: The column offset by which to translate the active Tetromino.
 void _translatePosition(int dr  = 0, int dc = 0) {
         int offsetArrayId = _getOffsets(_activeTetromino());
-        int row = _activeRow();
-        int col = _activeCol();
-        int d = _activeFacing();
         int t = _activeTetromino();
         // Sets the currently active tiles to be rendered as Invisible Objects.
         for (k0 = 0; < NUM_TILES) {
             Vector v = xsArrayGetVector(offsetArrayId, k0);
-            Vector vRotated = _rotateVector(v, d);
-            int r0 = xsVectorGetX(vRotated) + row;
-            int c0 = xsVectorGetY(vRotated) + col;
-            _setUpdateValue(r0, c0, d, 0, true);
+            Vector vRotated = _rotateVector(v, activeFacing);
+            int r0 = xsVectorGetX(vRotated) + activeRow;
+            int c0 = xsVectorGetY(vRotated) + activeCol;
+            _setUpdateValue(r0, c0, activeFacing, 0, true);
         }
         // Sets the newly active tiles to be rendered as units.
         // Overwrites and previous sets of `true` Invisible Objects to `false`
         // from the previous loop.
         for (k1 = 0; < NUM_TILES) {
             Vector v1 = xsArrayGetVector(offsetArrayId, k1);
-            Vector v1Rotated = _rotateVector(v1, d);
-            int r1 = xsVectorGetX(v1Rotated) + row;
-            int c1 = xsVectorGetY(v1Rotated) + col;
-            _setUpdateValue(r1 + dr, c1 + dc, d, 0, false);
-            _setUpdateValue(r1 + dr, c1 + dc, d, t, true);
+            Vector v1Rotated = _rotateVector(v1, activeFacing);
+            int r1 = xsVectorGetX(v1Rotated) + activeRow;
+            int c1 = xsVectorGetY(v1Rotated) + activeCol;
+            _setUpdateValue(r1 + dr, c1 + dc, activeFacing, 0, false);
+            _setUpdateValue(r1 + dr, c1 + dc, activeFacing, t, true);
         }
-        _setState(ROW_INDEX, row + dr);
-        _setState(COL_INDEX, col + dc);
+        activeRow = activeRow + dr;
+        activeCol = activeCol + dc;
 }
 
 /// Rotates the active Tetromino in direction `r`.
@@ -1373,40 +1257,37 @@ void _translatePosition(int dr  = 0, int dc = 0) {
 ///         One of `CLOCKWISE` or `COUNTERCLOCKWISE`.
 void _rotatePosition(int r = 0) {
     int offsetArrayId = _getOffsets(_activeTetromino());
-    int row = _activeRow();
-    int col = _activeCol();
-    int d = _activeFacing();
-    int newDir = _rotateDirection(d, r);
+    int newDir = _rotateDirection(activeFacing, r);
     int t = _activeTetromino();
     if (t == O) {
         for (kO = 0; < NUM_TILES) {
             Vector vO = xsArrayGetVector(offsetArrayId, kO);
-            int rO = xsVectorGetX(vO) + row;
-            int cO = xsVectorGetY(vO) + col;
-            _setUpdateValue(rO, cO, d, 0, true);
+            int rO = xsVectorGetX(vO) + activeRow;
+            int cO = xsVectorGetY(vO) + activeCol;
+            _setUpdateValue(rO, cO, activeFacing, 0, true);
             _setUpdateValue(rO, cO, newDir, t, true);
         }
     } else {
         int testIndex = _testRotations(r);
-        int testArrayId = _getRotationTests(t, d, r);
+        int testArrayId = _getRotationTests(t, activeFacing, r);
         Vector offset = xsArrayGetVector(testArrayId, testIndex);
         int dr = xsVectorGetX(offset);
         int dc = xsVectorGetY(offset);
         for (k = 0; < NUM_TILES) {
             Vector vUp = xsArrayGetVector(offsetArrayId, k);
-            Vector vOld = _rotateVector(vUp, d);
-            int rOld = xsVectorGetX(vOld) + row;
-            int cOld = xsVectorGetY(vOld) + col;
-            _setUpdateValue(rOld, cOld, d, 0, true);
+            Vector vOld = _rotateVector(vUp, activeFacing);
+            int rOld = xsVectorGetX(vOld) + activeRow;
+            int cOld = xsVectorGetY(vOld) + activeCol;
+            _setUpdateValue(rOld, cOld, activeFacing, 0, true);
             Vector vNew = _rotateVector(vUp, newDir);
-            int rNew = xsVectorGetX(vNew) + row + dr;
-            int cNew = xsVectorGetY(vNew) + col + dc;
+            int rNew = xsVectorGetX(vNew) + activeRow + dr;
+            int cNew = xsVectorGetY(vNew) + activeCol + dc;
             _setUpdateValue(rNew, cNew, newDir, t, true);
         }
-        _setState(ROW_INDEX, row + dr);
-        _setState(COL_INDEX, col + dc);
+        activeRow = activeRow + dr;
+        activeCol = activeCol + dc;
     }
-    _setState(DIR_INDEX, newDir);
+    activeFacing = newDir;
 }
 
 /// Returns `true` if the active `Tetromino` can drop into row `r`.
@@ -1414,14 +1295,13 @@ void _rotatePosition(int r = 0) {
 /// `_canDrop(r') == true`.
 bool _canDrop(int r = 0) {
     int offsetsId = _getOffsets(_activeTetromino());
-    int d = _activeFacing();
     // row of its indices.
-    int dr = r - _activeRow();
+    int dr = r - activeRow;
     for (k = 0; < NUM_TILES) {
         Vector vUp = xsArrayGetVector(offsetsId, k);
-        Vector v = _rotateVector(vUp, d);
-        int row = _activeRow() + xsVectorGetX(v) + dr;
-        int col = _activeCol() + xsVectorGetY(v);
+        Vector v = _rotateVector(vUp, activeFacing);
+        int row = activeRow + xsVectorGetX(v) + dr;
+        int col = activeCol + xsVectorGetY(v);
         if (_isInBoundsAndEmpty(row, col) == false) {
             return (false);
         }
@@ -1431,12 +1311,12 @@ bool _canDrop(int r = 0) {
 
 /// into which the Tetromino may drop.
 int _numDropRows() {
-    int r = _activeRow() + 1;
+    int r = activeRow + 1;
     // The active Tetrmino can drop its center to all rows in `_activeRow()..r`.
     while (_canDrop(r)) {
         r++;
     }
-    return (r - 1 - _activeRow());
+    return (r - 1 - activeRow);
 }
 
 /// Updates the score when `numCleared` lines are cleared.
@@ -1448,8 +1328,7 @@ void _updateScore(int numCleared = 0) {
         // Note that the level is the level before the line clear.
         int oldScore = xsTriggerVariable(SCORE_ID);
         int oldLevel = xsTriggerVariable(LEVEL_ID);
-        int oldDifficult = _getState(DIFFICULT_INDEX);
-        int difficult = NOT_DIFFICULT;
+        bool newDifficult = false;
         if (numCleared == 1) {
             xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 100);
         } else if (numCleared == 2) {
@@ -1458,13 +1337,12 @@ void _updateScore(int numCleared = 0) {
             xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * 500);
         } else if (numCleared == 4) {
             int scoreClear4 = 800;
-            if (oldDifficult == DIFFICULT) {
+            if (difficult) {
                 scoreClear4 = scoreClear4 * 3 / 2;
             }
             xsSetTriggerVariable(SCORE_ID, oldScore + oldLevel * scoreClear4);
-            difficult = DIFFICULT;
+            newDifficult = true;
         }
-
         xsSetTriggerVariable(
             LINES_ID, xsTriggerVariable(LINES_ID) + numCleared
         );
@@ -1472,7 +1350,7 @@ void _updateScore(int numCleared = 0) {
             LEVEL_ID,
             (xsTriggerVariable(LINES_ID) + LINES_PER_LEVEL) / LINES_PER_LEVEL
         );
-        _setState(DIFFICULT_INDEX, difficult);
+        difficult = newDifficult;
 }
 
 /// Clears lines and updates the game score after a Tetromino is locked
@@ -1499,50 +1377,63 @@ void _clearLines() {
 /// Activates the next Tetromino, ending the game if there is no room
 /// to spawn it.
 void _spawnNextTetromino() {
-        int seqIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
-        if (seqIndex == NUM_TETROMINOS - 1) {
-            for (seqK = 0; < NUM_TETROMINOS) {
-                int value = _getSequence(seqK + NUM_TETROMINOS);
-                _setSequence(seqK, value);
-                _setSequence(seqK + NUM_TETROMINOS, seqK + 1);
-            }
-            _setState(SEQ_SHUFFLE_INDEX, SHUFFLE);
-            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, 0);
-        } else {
-            _setState(TETROMINO_SEQUENCE_INDEX_INDEX, seqIndex + 1);
+    if (tetrominoSeqIndex == NUM_TETROMINOS - 1) {
+        for (seqK = 0; < NUM_TETROMINOS) {
+            int value = _getSequence(seqK + NUM_TETROMINOS);
+            _setSequence(seqK, value);
+            _setSequence(seqK + NUM_TETROMINOS, seqK + 1);
         }
+        canShuffleSecondSeq = true;
+        tetrominoSeqIndex = 0;
+    } else {
+        tetrominoSeqIndex = tetrominoSeqIndex + 1;
+    }
 
-        // If any of the offsets of placing a new piece or of moving it down
-        // one row are occupied, then the player is defeated.
-        _setState(ROW_INDEX, PLACE_ROW);
-        _setState(COL_INDEX, PLACE_COL);
-        _setState(DIR_INDEX, PLACE_DIR);
+    // If any of the offsets of placing a new piece or of moving it down
+    // one row are occupied, then the player is defeated.
+    activeRow = PLACE_ROW;
+    activeCol = PLACE_COL;
+    activeFacing = PLACE_DIR;
 
-        // Check for defeats, and moves the Tetromino down.
-        int offsetsId1 = _getOffsets(_activeTetromino());
-        for (k1 = 0; < NUM_TILES) {
-            Vector v1 = xsArrayGetVector(offsetsId1, k1);
-            int r1 = xsVectorGetX(v1) + _activeRow();
-            int c1 = xsVectorGetY(v1) + _activeCol();
-            if (_isInBoundsAndEmpty(r1, c1) == false) {
-                _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_OVER);
-            }
+    // Checks for defeats.
+    int offsetsId1 = _getOffsets(_activeTetromino());
+    for (k1 = 0; < NUM_TILES) {
+        Vector v1 = xsArrayGetVector(offsetsId1, k1);
+        int r1 = xsVectorGetX(v1) + activeRow;
+        int c1 = xsVectorGetY(v1) + activeCol;
+        if (_isInBoundsAndEmpty(r1, c1) == false) {
+            gameOver = true;
         }
+    }
 
-        _setState(ROW_INDEX, PLACE_ROW + 1);
-        int offsetsId2 = _getOffsets(_activeTetromino());
-        for (k2 = 0; < NUM_TILES) {
-            Vector v2 = xsArrayGetVector(offsetsId2, k2);
-            int r2 = xsVectorGetX(v2) + _activeRow();
-            int c2 = xsVectorGetY(v2) + _activeCol();
-            if (_isInBoundsAndEmpty(r2, c2) == false) {
-                _setState(GAME_OVER_OR_PLAYING_INDEX, GAME_OVER);
-            }
-            _setUpdateValue(
-                r2, c2, _activeFacing(), _activeTetromino(), true
-            );
+    // Moves the Tetromino down.
+    activeRow = activeRow + 1;
+    int offsetsId2 = _getOffsets(_activeTetromino());
+    for (k2 = 0; < NUM_TILES) {
+        Vector v2 = xsArrayGetVector(offsetsId2, k2);
+        int r2 = xsVectorGetX(v2) + activeRow;
+        int c2 = xsVectorGetY(v2) + activeCol;
+        if (_isInBoundsAndEmpty(r2, c2) == false) {
+            gameOver = true;
         }
-        _setState(CAN_RENDER_NEXT_INDEX, RENDER_NEXT);
+        _setUpdateValue(
+            r2, c2, activeFacing, _activeTetromino(), true
+        );
+    }
+    renderNext = true;
+}
+
+/// Sets the update array to replace the rendering of the active tetromino
+/// with invisible objects.
+void _clearActiveTetrominoRender() {
+        int offsetsId = _getOffsets(_activeTetromino());
+        for (k = 0; < NUM_TILES) {
+            Vector vUp = xsArrayGetVector(offsetsId, k);
+            Vector v = _rotateVector(vUp, activeFacing);
+            int r = xsVectorGetX(v) + activeRow;
+            int c = xsVectorGetY(v) + activeCol;
+            _setUpdateValue(r, c, activeFacing, 0, true);
+        }
 }
 
 /// Updates the game state.
@@ -1572,29 +1463,32 @@ void update() {
             SCORE_ID, score + HARD_DROP_MULTIPLIER * level * numRows
         );
         int offsetsId = _getOffsets(_activeTetromino());
-        // Sets the update array to clear the previous position.
-        for (k0 = 0; < NUM_TILES) {
-            Vector v0 = xsArrayGetVector(offsetsId, k0);
-            Vector v0Rotated = _rotateVector(v0, _activeFacing());
-            int r0 = xsVectorGetX(v0Rotated) + _activeRow();
-            int c0 = xsVectorGetY(v0Rotated) + _activeCol();
-            _setUpdateValue(r0, c0, _activeFacing(), 0, true);
-        }
+        _clearActiveTetrominoRender();
         // Sets the update array to render the new position.
         for (k1 = 0; < NUM_TILES) {
             Vector v1 = xsArrayGetVector(offsetsId, k1);
-            Vector v1Rotated = _rotateVector(v1, _activeFacing());
-            int r1 = xsVectorGetX(v1Rotated) + _activeRow() + numRows;
-            int c1 = xsVectorGetY(v1Rotated) + _activeCol();
-            _setUpdateValue(r1, c1, _activeFacing(), 0, false);
-            _setUpdateValue(r1, c1, _activeFacing(), _activeTetromino(), true);
-            _setBoardValue(r1, c1, _activeFacing(), _activeTetromino());
+            Vector v1Rotated = _rotateVector(v1, activeFacing);
+            int r1 = xsVectorGetX(v1Rotated) + activeRow + numRows;
+            int c1 = xsVectorGetY(v1Rotated) + activeCol;
+            _setUpdateValue(r1, c1, activeFacing, 0, false);
+            _setUpdateValue(r1, c1, activeFacing, _activeTetromino(), true);
+            _setBoardValue(r1, c1, activeFacing, _activeTetromino());
         }
-        _setState(ROW_INDEX, _activeRow() + numRows);
+        activeRow = activeRow + numRows;
         _clearLines();
+        isHoldLegal = true;
         _spawnNextTetromino();
     } else if (_canHold()) {
-        // TODO implement
+        _clearActiveTetrominoRender();
+        int oldHold = heldTetromino;
+        heldTetromino = _activeTetromino();
+        if (oldHold != 0) {
+            _setSequence(tetrominoSeqIndex, oldHold);
+            tetrominoSeqIndex = tetrominoSeqIndex - 1;
+        }
+        isHoldLegal = false;
+        renderHold = true;
+        _spawnNextTetromino();
     }
 }
 
@@ -1615,24 +1509,23 @@ bool canRenderTile(int r = 0, int c = 0, int d = 0, int t = 0) {
 
 /// Returns `true` if the next piece indicated by `index` should have its units
 /// replaced with units of shape `t`, `false` if not.
+/// The next board should be updated to display Tetromino `t` if `t` is at
+/// the board's sequence index and the board does not currently
+/// contain that Tetromino.
 ///
 /// Parameters:
 ///     index: Either 0, 1, or 2, indicating which of the next 3 pieces
 ///         to place.
 ///     t: The Tetromino value for the piece to render. In `1..=7`.
 bool canRenderNext(int index = 0, int t = 0) {
-    if (_getState(CAN_RENDER_NEXT_INDEX) == NO_RENDER_NEXT) {
+    if (renderNext == false) {
         return (false);
     }
-    int currentIndex = _getState(TETROMINO_SEQUENCE_INDEX_INDEX);
-    int prevIndex = currentIndex + index;
-    int prevTetromino = _getSequence(prevIndex);
-    int nextIndex = currentIndex + 1 + index;
+    int currentIndex = tetrominoSeqIndex + index;
+    int currentTetromino = _getSequence(currentIndex);
+    int nextIndex = currentIndex + 1;
     int nextTetromino = _getSequence(nextIndex);
-    // The next board should be updated to display Tetromino `t` if `t` is at
-    // the board's sequence index and the board does not currently
-    // contain that Tetromino.
-    return (t == nextTetromino && prevTetromino != nextTetromino);
+    return (t == nextTetromino && currentTetromino != nextTetromino);
 }
 
 /// Returns `true` if the Hold unit should have its units replaced with
@@ -1642,8 +1535,11 @@ bool canRenderNext(int index = 0, int t = 0) {
 ///     t: The Tetromino value for the piece to render, or `0` if the hold
 ///         should be rendered with Invisible Objects. In `0..=7`.
 bool canRenderHold(int t = 0) {
-    // TODO implement
-    return (false);
+    if (renderHold == false) {
+        return (false);
+    }
+    // Only re-renders if the Tetromino is different.
+    return (heldTetromino != t);
 }
 
 /// Scratch test function.
