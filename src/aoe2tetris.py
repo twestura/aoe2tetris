@@ -29,6 +29,8 @@ from xscalls import ScriptCaller
 import argparse
 import os.path
 
+# TODO disable/enable object selection instead of change ownership.
+
 
 SCN_EXT = "aoe2scenario"  # Scenario file extension.
 OUT_SCN_DIR = "out-scns"  # Output directory for built files.
@@ -88,6 +90,9 @@ def _impl_init_invisible_object_ownership(tdata: TetrisData):
         for row in board:
             for u in row:
                 units.append(u)
+    for row in tdata.hold_units:
+        for u in row:
+            units.append(u)
     tdata.init_scenario.add_effect(
         Effect.CHANGE_OWNERSHIP,
         source_player=Player.ONE,
@@ -186,7 +191,6 @@ def _impl_render_next_triggers(tdata: TetrisData, xs: ScriptCaller):
     for index, (trigger_board, unit_board) in enumerate(
         zip(tdata.render_next_triggers, tdata.next_units)
     ):
-        # TODO debug the occasional wrong Tetromino...
         all_unit_ids = {u.reference_id for row in unit_board for u in row}
         for t, trigger in enumerate(trigger_board):
             tetromino = Tetromino.from_int(t + 1)
@@ -198,20 +202,10 @@ def _impl_render_next_triggers(tdata: TetrisData, xs: ScriptCaller):
             unit_ids = list(all_unit_ids - gaia_id_set)
             gaia_ids = list(gaia_id_set)
             trigger.add_effect(
-                Effect.CHANGE_OWNERSHIP,
-                target_player=tetromino.player,
-                selected_object_ids=unit_ids,
-            )
-            trigger.add_effect(
                 Effect.REPLACE_OBJECT,
                 target_player=tetromino.player,
                 object_list_unit_id_2=tetromino.unit,
                 selected_object_ids=unit_ids,
-            )
-            trigger.add_effect(
-                Effect.CHANGE_OWNERSHIP,
-                target_player=Player.GAIA,
-                selected_object_ids=gaia_ids,
             )
             trigger.add_effect(
                 Effect.REPLACE_OBJECT,
@@ -219,6 +213,69 @@ def _impl_render_next_triggers(tdata: TetrisData, xs: ScriptCaller):
                 object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
                 selected_object_ids=gaia_ids,
             )
+
+
+def _impl_render_hold_triggers(tdata: TetrisData, xs: ScriptCaller):
+    """Implements the triggers for rendering the hold board."""
+    renderInvisible = tdata.render_hold_triggers[0]
+    renderInvisible.add_condition(
+        Condition.SCRIPT_CALL,
+        xs_function=xs.can_render_hold(None),
+    )
+    all_unit_ids = {u.reference_id for row in tdata.hold_units for u in row}
+    renderInvisible.add_effect(
+        Effect.REPLACE_OBJECT,
+        target_player=Player.GAIA,
+        object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+        selected_object_ids=list(all_unit_ids),
+    )
+
+    for t in range(1, Tetromino.num() + 1):
+        tetromino = Tetromino.from_int(t)
+        trigger = tdata.render_hold_triggers[t]
+        trigger.add_condition(
+            Condition.SCRIPT_CALL, xs_function=xs.can_render_hold(tetromino)
+        )
+        gaia_id_set = all_unit_ids - tetromino.board_unit_ids(tdata.hold_units)
+        unit_ids = list(all_unit_ids - gaia_id_set)
+        gaia_ids = list(gaia_id_set)
+        trigger.add_effect(
+            Effect.REPLACE_OBJECT,
+            target_player=tetromino.player,
+            object_list_unit_id_2=tetromino.unit,
+            selected_object_ids=unit_ids,
+        )
+        trigger.add_effect(
+            Effect.REPLACE_OBJECT,
+            target_player=Player.GAIA,
+            object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+            selected_object_ids=gaia_ids,
+        )
+
+
+def _add_render_trigger_toggles(
+    tdata: TetrisData, activator: TriggerObject, deactivator: TriggerObject
+):
+    """
+    Appends effects to activate and deactivate the render triggers.
+
+    Parameters:
+        activator: The trigger to which the activate effects are appended.
+        deactivator: The trigger to which the deactivate effects are appended.
+    """
+    triggers = []
+    for t in tdata.render_triggers.values():
+        triggers.append(t)
+    for next_list in tdata.render_next_triggers:
+        for t in next_list:
+            triggers.append(t)
+    for t in tdata.render_hold_triggers:
+        triggers.append(t)
+    for t in triggers:
+        activator.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id)
+        deactivator.add_effect(
+            Effect.DEACTIVATE_TRIGGER, trigger_id=t.trigger_id
+        )
 
 
 def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
@@ -271,27 +328,17 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
 
     _impl_render_triggers(tdata, xs)
     _impl_render_next_triggers(tdata, xs)
+    _impl_render_hold_triggers(tdata, xs)
+
     tdata.begin_game.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_mid.trigger_id
     )
     tdata.begin_game_mid.add_effect(
         Effect.SCRIPT_CALL, message=xs.begin_game_mid()
     )
-    for render in tdata.render_triggers.values():
-        tdata.begin_game_mid.add_effect(
-            Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
-        )
-        tdata.begin_game_end.add_effect(
-            Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
-        )
-    for render_next_list in tdata.render_next_triggers:
-        for render_next in render_next_list:
-            tdata.begin_game_mid.add_effect(
-                Effect.ACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
-            )
-            tdata.begin_game_end.add_effect(
-                Effect.DEACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
-            )
+    _add_render_trigger_toggles(
+        tdata, tdata.begin_game_mid, tdata.begin_game_end
+    )
     tdata.begin_game_mid.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_end.trigger_id
     )
@@ -374,22 +421,7 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     tdata.game_over.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.can_begin.trigger_id
     )
-    for render in tdata.render_triggers.values():
-        tdata.update.add_effect(
-            Effect.ACTIVATE_TRIGGER, trigger_id=render.trigger_id
-        )
-        tdata.cleanup.add_effect(
-            Effect.DEACTIVATE_TRIGGER, trigger_id=render.trigger_id
-        )
-    for render_next_list in tdata.render_next_triggers:
-        for render_next in render_next_list:
-            tdata.update.add_effect(
-                Effect.ACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
-            )
-            tdata.cleanup.add_effect(
-                Effect.DEACTIVATE_TRIGGER, trigger_id=render_next.trigger_id
-            )
-
+    _add_render_trigger_toggles(tdata, tdata.update, tdata.cleanup)
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
     )
@@ -442,9 +474,8 @@ def impl_triggers(variables: Variables, tdata: TetrisData):
     xs = ScriptCaller()
     tdata.init_scenario.add_effect(
         Effect.SCRIPT_CALL,
-        message=xs.init_xs_array(),
+        message=xs.init_xs_state(),
     )
-    xs.init_xs_array()
     _impl_init_invisible_object_ownership(tdata)
     _impl_objectives(variables, tdata)
     _impl_hotkey_initialization(tdata)

@@ -80,21 +80,9 @@ class Tetromino(Enum):
         Raises:
             ValueError if `t` does not represent a `Tetromino`.
         """
-        if t == Tetromino.L.value:
-            return Tetromino.L
-        if t == Tetromino.Z.value:
-            return Tetromino.Z
-        if t == Tetromino.S.value:
-            return Tetromino.S
-        if t == Tetromino.O.value:
-            return Tetromino.O
-        if t == Tetromino.I.value:
-            return Tetromino.I
-        if t == Tetromino.T.value:
-            return Tetromino.T
-        if t == Tetromino.J.value:
-            return Tetromino.J
-        raise ValueError(f"{t} does not represent a Tetromino")
+        if t not in _FROM_INT:
+            raise ValueError(f"{t} does not represent a Tetromino")
+        return _FROM_INT[t]
 
     @staticmethod
     def init_seq() -> int:
@@ -147,4 +135,15 @@ _INDICES = {
     Tetromino.S: {Index(0, -1), Index(0, 0), Index(-1, 0), Index(-1, 1)},
     Tetromino.T: {Index(0, -1), Index(0, 0), Index(0, 1), Index(-1, 0)},
     Tetromino.Z: {Index(-1, -1), Index(-1, 0), Index(0, 0), Index(0, 1)},
+}
+
+# Maps an integer to the Tetromino it represents.
+_FROM_INT = {
+    Tetromino.L.value: Tetromino.L,
+    Tetromino.Z.value: Tetromino.Z,
+    Tetromino.S.value: Tetromino.S,
+    Tetromino.O.value: Tetromino.O,
+    Tetromino.I.value: Tetromino.I,
+    Tetromino.T.value: Tetromino.T,
+    Tetromino.J.value: Tetromino.J,
 }

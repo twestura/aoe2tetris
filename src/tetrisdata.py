@@ -31,6 +31,11 @@ DisplayBoard = List[List[UnitObject]]
 # value `c + 1`.
 NextRenderTriggers = List[List[TriggerObject]]
 
+# The element at index `k` is the hold render trigger for the `Tetromino` with
+# `int` representation `k`. The element at index `0` is the hold render trigger
+# for Invisible Objects.
+HoldRenderTriggers = List[TriggerObject]
+
 # The number of rows to leave between the start of rows of the next unit boards.
 NEXT_ROW_SPACING = 4
 
@@ -343,6 +348,14 @@ def _declare_render_next_triggers(tmgr: TMgr) -> NextRenderTriggers:
     ]
 
 
+def _declare_render_hold_triggers(tmgr: TMgr) -> HoldRenderTriggers:
+    """Returns the triggers for rendering the hold Tetromino board."""
+    return [
+        tmgr.add_trigger(f"Render hold {t}", enabled=False)
+        for t in range(Tetromino.num() + 1)
+    ]
+
+
 class TetrisData:
     """
     An instance represents the trigger declarations and units for Tetris.
@@ -418,7 +431,7 @@ class TetrisData:
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
         self._render_next_triggers = _declare_render_next_triggers(tmgr)
-        # TODO render hold
+        self._render_hold_triggers = _declare_render_hold_triggers(tmgr)
         self._game_over = tmgr.add_trigger("Game Over", enabled=False)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
@@ -555,3 +568,8 @@ class TetrisData:
     def hold_units(self) -> DisplayBoard:
         """Returns the units for rendering the hold Tetromino."""
         return self._hold_units
+
+    @property
+    def render_hold_triggers(self) -> HoldRenderTriggers:
+        """Returns the triggers for rendering the hold Tetromino board."""
+        return self._render_hold_triggers

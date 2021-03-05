@@ -178,6 +178,10 @@ bool renderHold = false;
 /// equals `0` if no tetromino is held.
 int heldTetromino = 0;
 
+/// Equals the int value of the tetromino that was held before the currently
+/// help Tetromino.
+int prevHeld = 0;
+
 // =============================================================================
 // Utility Functions
 // =============================================================================
@@ -616,6 +620,8 @@ void _moveRowsDown(int row = 0) {
 // Tetromino Sequence
 // =============================================================================
 
+// TODO debug sequence
+
 /// Initializes the Tetromino Sequence.
 ///
 /// Note this funciton does not shuffle the sequences. Shuffling is performed
@@ -1046,14 +1052,15 @@ int _testRotations(int r = 0) {
 // Scenario Initialization
 // =============================================================================
 
-/// Initializes the array of xs data and stores it's id in the variable
-/// with id `XS_ARRAY_VAR_ID`.
-void initXsArray() {
+/// Initializes the state data for the xs script.
+void initXsState() {
     _initBoard();
     _initUpdate();
     _initSequence();
     _initOffsetArrays();
     _initRotationArrays();
+    prevHeld = 0;
+    heldTetromino = 0;
 }
 
 // =============================================================================
@@ -1072,12 +1079,17 @@ void beginGame() {
     _initGameVariables();
     _clearBoard();
     _clearUpdate();
+    for (k = 0; < NUM_TETROMINOS) {
+        _setSequence(k, k + 1);
+        _setSequence(k + NUM_TETROMINOS, k + 1);
+    }
     tetrominoSeqIndex = 0;
     difficult = false;
     gameOver = false;
     renderNext = true;
     renderHold = true;
     isHoldLegal = true;
+    prevHeld = heldTetromino;
     heldTetromino = 0;
 }
 
@@ -1480,10 +1492,10 @@ void update() {
         _spawnNextTetromino();
     } else if (_canHold()) {
         _clearActiveTetrominoRender();
-        int oldHold = heldTetromino;
+        prevHeld = heldTetromino;
         heldTetromino = _activeTetromino();
-        if (oldHold != 0) {
-            _setSequence(tetrominoSeqIndex, oldHold);
+        if (prevHeld != 0) {
+            _setSequence(tetrominoSeqIndex, prevHeld);
             tetrominoSeqIndex = tetrominoSeqIndex - 1;
         }
         isHoldLegal = false;
@@ -1539,7 +1551,7 @@ bool canRenderHold(int t = 0) {
         return (false);
     }
     // Only re-renders if the Tetromino is different.
-    return (heldTetromino != t);
+    return (heldTetromino == t && prevHeld != t);
 }
 
 /// Scratch test function.

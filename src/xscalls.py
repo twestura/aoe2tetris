@@ -24,9 +24,9 @@ class ScriptCaller:
         """Initializes a new script caller."""
         self._suffix = -1  # Increments at the start of every method.
 
-    def init_xs_array(self):
+    def init_xs_state(self):
         """
-        Initializes the scenario's xs state array.
+        Initializes the scenario's xs state.
 
         Must be called in a trigger effect immediately upon the scenario's
         launch.
@@ -35,7 +35,7 @@ class ScriptCaller:
         return "\n".join(
             [
                 f"void _{self._suffix}() " + "{",
-                "    initXsArray();",
+                "    initXsState();",
                 "}",
             ]
         )
@@ -49,7 +49,7 @@ class ScriptCaller:
         Essentially calls `name(param[0], param[1], ..., param[n])`.
 
         Checks that self._suffix is nonnegative in order to ensure that
-        the xs state array is initialized.
+        the xs state is initialized.
 
         Parameters:
             name: The name of the xs function in `Tetris.xs`.
@@ -170,6 +170,16 @@ class ScriptCaller:
         if index not in {0, 1, 2}:
             raise ValueError(f"{index} must be `0`, `1`, or `2`.")
         return self._call_function("canRenderNext", [str(index), str(t.value)])
+
+    def can_render_hold(self, t: Optional[Tetromino]) -> str:
+        """
+        Returns a condition string to check if the hold board should update to
+        display the `Tetromino` `t`, or to display Invisible Objects if `t`
+        is `None`.
+        """
+        return self._call_function(
+            "canRenderHold", [str(t.value) if t else "0"]
+        )
 
     def test(self) -> str:
         """Calls a string to call a test xs functions."""
