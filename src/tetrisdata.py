@@ -432,6 +432,7 @@ class TetrisData:
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
         self._render_next_triggers = _declare_render_next_triggers(tmgr)
         self._render_hold_triggers = _declare_render_hold_triggers(tmgr)
+        self._react_tetris = tmgr.add_trigger("React Tetris", enabled=False)
         self._game_over = tmgr.add_trigger("Game Over", enabled=False)
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
@@ -573,3 +574,8 @@ class TetrisData:
     def render_hold_triggers(self) -> HoldRenderTriggers:
         """Returns the triggers for rendering the hold Tetromino board."""
         return self._render_hold_triggers
+
+    @property
+    def react_tetris(self) -> TriggerObject:
+        """Returns a trigger to react to a player's clearing 4 lines."""
+        return self._react_tetris

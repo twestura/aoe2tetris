@@ -186,6 +186,10 @@ int prevHeld = 0;
 /// Nonnegative.
 int timer = 0;
 
+/// `true` if the player has cleared 4 rows, `false` otherwise.
+/// Signals the game to react to the event of scoring a Tetris.
+bool reactTetris = false;
+
 // =============================================================================
 // Utility Functions
 // =============================================================================
@@ -655,8 +659,6 @@ void _moveRowsDown(int row = 0) {
 // =============================================================================
 // Tetromino Sequence
 // =============================================================================
-
-// TODO debug sequence
 
 /// Initializes the Tetromino Sequence.
 ///
@@ -1177,6 +1179,7 @@ void initGameLoop() {
     canShuffleSecondSeq = false;
     renderNext = false;
     renderHold = false;
+    reactTetris = false;
     _setAllUpdate(false);
 }
 
@@ -1419,6 +1422,9 @@ void _clearLines() {
                 row--;
             }
         }
+        if (numCleared == 4) {
+            reactTetris = true;
+        }
         // TODO make pieces explode or something fun
         _updateScore(numCleared);
 }
@@ -1518,7 +1524,6 @@ void _lockDown(int numRows = 0) {
 /// Call in a trigger after storing user input in the `Selected` variable
 /// and before executing the render triggers.
 void update() {
-    // TODO update timer logic
     if (_canMoveLeft()) {
         _translatePosition(0, -1);
         timer = 1;
@@ -1621,6 +1626,16 @@ bool canRenderHold(int t = 0) {
     }
     // Only re-renders if the Tetromino is different.
     return (heldTetromino == t && prevHeld != t);
+}
+
+/// Returns `true` if a player score's a Tetris on this game tick.
+bool canReactTetris() {
+    return (reactTetris);
+}
+
+/// Acknowledges that the game has reacted to a Tetris.
+void clearReactTetris() {
+    reactTetris = false;
 }
 
 /// Scratch test function.

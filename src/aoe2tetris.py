@@ -13,6 +13,7 @@ from AoE2ScenarioParser.datasets.conditions import Condition
 from AoE2ScenarioParser.datasets.effects import Effect
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.trigger_lists import (
+    AttackStance,
     ObjectAttribute,
     Operation,
 )
@@ -28,8 +29,6 @@ from variables import Variables
 from xscalls import ScriptCaller
 import argparse
 import os.path
-
-# TODO disable/enable object selection instead of change ownership.
 
 
 SCN_EXT = "aoe2scenario"  # Scenario file extension.
@@ -99,6 +98,16 @@ def _impl_init_invisible_object_ownership(tdata: TetrisData):
         target_player=Player.GAIA,
         selected_object_ids=([u.reference_id for u in units]),
     )
+
+
+def _impl_no_attack_stance(tdata: TetrisData):
+    """Adds an initialization effect to set all units to No Attack Stance."""
+    for p in PLAYERS:
+        tdata.init_scenario.add_effect(
+            Effect.CHANGE_OBJECT_STANCE,
+            source_player=p,
+            attack_stance=AttackStance.NO_ATTACK_STANCE,
+        )
 
 
 def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
@@ -396,6 +405,7 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     tdata.game_loop.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.update.trigger_id
     )
+
     # Update activates the render triggers, that way new game doesn't have to
     # deactivate them.
     tdata.update.add_effect(Effect.SCRIPT_CALL, message=xs.update())
@@ -403,6 +413,21 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.shuffle.trigger_id
     )
     tdata.shuffle.add_condition(Condition.SCRIPT_CALL, xs_function=xs.shuffle())
+
+    tdata.update.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.react_tetris.trigger_id
+    )
+    tdata.react_tetris.add_condition(
+        Condition.SCRIPT_CALL, xs_function=xs.can_react_tetris()
+    )
+    tdata.react_tetris.add_effect(
+        Effect.SCRIPT_CALL, message=xs.clear_react_tetris()
+    )
+    tdata.react_tetris.add_effect(Effect.PLAY_SOUND, sound_name="PLAY_TAUNT_30")
+    tdata.cleanup.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.react_tetris.trigger_id
+    )
+
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_over.trigger_id
     )
@@ -477,6 +502,7 @@ def impl_triggers(variables: Variables, tdata: TetrisData):
         message=xs.init_xs_state(),
     )
     _impl_init_invisible_object_ownership(tdata)
+    _impl_no_attack_stance(tdata)
     _impl_objectives(variables, tdata)
     _impl_hotkey_initialization(tdata)
     _impl_begin_game(variables, tdata, xs)
@@ -490,13 +516,6 @@ def build(args):
     Parameters:
         args: Command-line options passed to affect scenario generation. TBD.
     """
-    # TODO this is broken, update when library is fixed 11
-    # scn = AoE2Scenario.create_default()
-    # This is broken too...
-    # scn = AoE2Scenario.from_file('src-scns/default-scenario.aoe2scenario')
-
-    # Use this example scenario for now.
-    # Eventually set the player metadata in this code instead of in the editor.
     scn = AoE2Scenario.from_file("src-scns/tetris-base.aoe2scenario")
     mmgr = scn.map_manager
     tmgr = scn.trigger_manager

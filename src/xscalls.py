@@ -181,6 +181,17 @@ class ScriptCaller:
             "canRenderHold", [str(t.value) if t else "0"]
         )
 
+    def can_react_tetris(self) -> str:
+        """Returns a conditions string to check if a player scored a Tetris."""
+        return self._call_function("canReactTetris")
+
+    def clear_react_tetris(self) -> str:
+        """
+        Returns an effect string to signal that the game has responded to
+        a Tetris.
+        """
+        return self._call_function('clearReactTetris')
+
     def test(self) -> str:
         """Calls a string to call a test xs functions."""
         return self._call_function("test")
