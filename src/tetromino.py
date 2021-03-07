@@ -105,12 +105,12 @@ _STR = {
 # Maps a Tetromino to the unit that represents it.
 _UNIT = {
     Tetromino.Z: Unit.ELITE_BERSERK,
-    Tetromino.S: Unit.ELITE_HUSKARL,
-    Tetromino.O: Unit.ELITE_THROWING_AXEMAN,
+    Tetromino.S: Unit.ELITE_EAGLE_WARRIOR,
+    Tetromino.O: Unit.ELITE_JAGUAR_WARRIOR,
     Tetromino.I: Unit.ELITE_TEUTONIC_KNIGHT,
     Tetromino.T: Unit.ELITE_SAMURAI,
     Tetromino.J: Unit.ELITE_WOAD_RAIDER,
-    Tetromino.L: Unit.ELITE_LONGBOWMAN,
+    Tetromino.L: Unit.ELITE_HUSKARL,
 }
 
 

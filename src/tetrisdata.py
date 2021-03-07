@@ -383,10 +383,10 @@ class TetrisData:
         `building_x` is the x tile coordinate for spawning selection buildings.
         `building_y` is the y tile coordinate for spawning selection buildings.
         """
-        revealer_len = mmgr.map_width // 2
-        revlenadj = 15
-        for x in range(revealer_len - revlenadj, revealer_len + revlenadj):
-            for y in range(revealer_len - revlenadj, revealer_len + revlenadj):
+        rev_len = mmgr.map_width // 2
+        rev_offset = 15
+        for x in range(rev_len - rev_offset, rev_len + rev_offset + 1):
+            for y in range(rev_len - rev_offset, rev_len + rev_offset + 1):
                 umgr.add_unit(
                     player=Player.ONE, unit_const=MAP_REVEALER, x=x, y=y
                 )

@@ -65,12 +65,12 @@ PLAYER_COLOR_NAMES = {
 # Maps a player number to the associated Tetromino unit id.
 PLAYER_TETROMINO = {
     Player.TWO: Unit.ELITE_BERSERK,
-    Player.THREE: Unit.ELITE_HUSKARL,
-    Player.FOUR: Unit.ELITE_THROWING_AXEMAN,
+    Player.THREE: Unit.ELITE_EAGLE_WARRIOR,
+    Player.FOUR: Unit.ELITE_JAGUAR_WARRIOR,
     Player.FIVE: Unit.ELITE_TEUTONIC_KNIGHT,
     Player.SIX: Unit.ELITE_SAMURAI,
     Player.SEVEN: Unit.ELITE_WOAD_RAIDER,
-    Player.EIGHT: Unit.ELITE_LONGBOWMAN,
+    Player.EIGHT: Unit.ELITE_HUSKARL,
 }
 
 

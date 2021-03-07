@@ -3,10 +3,36 @@
 An implementation of Tetris that is playable as an Age of Empires II scenario.
 The download link will be available on [https://www.ageofempires.com/mods](https://www.ageofempires.com/mods).
 
+## Installation and Setup
+
+<!-- TODO separate visual mod to remove the gaia selection noises. -->
+
+To play Tetris, you must:
+
+1. Subscribe to the mod.
+2. Setup hotkeys.
+3. Select both the scenario and the data mod.
+
+**Subscribe to the mod.**
+From Aoe2 DE's main menu, click the gear icon in the top right.
+Then select Mods.
+From the Browse Mods tab, search for "Tetris".
+Select the mod and click Subscribe.
+The mod will have a green check mark next to it when it finishes downloading.
+
+**Setup hotkeys.**
+From Aoe2 DE's main menu, click the gear icon in the top right.
+Then select Options.
+From the Hotkeys tab, use the dropdown menu on the right side to select the Tetris hotkey profile.
+Remember to switch back to your normal hotkey profile when finished playing Tetris.
+
+**Launch the game.**
+The scenario is launched by starting a single player game.
+Use the first two dropdown menus in the top-right of the Game Settings.
+
 ## Hotkeys
 
 The game uses the "Select All" hotkeys to implement player hotkeys without moving the camera.
-The hotkeys and their actions are described in the following table and topic paragraphs.
 
 | Action                     | Hotkey                     | Value |
 | -------------------------- | -------------------------- | ----- |
@@ -45,12 +71,12 @@ Each piece is represented in this scenario by a distinct color and unique unit.
 | Name  | Color  | Unit (Civilization)       |
 | ----- | -----  | -------------------       |
 | Z     | Red    | Berserk (Vikings)         |
-| S     | Green  | Huskarl (Goths)           |
-| O     | Yellow | Throwing Axeman (Franks)  |
+| S     | Green  | Eagle Warrior (Mayans)    |
+| O     | Yellow | Jaguar Warrior (Aztecs)   |
 | I     | Cyan   | Teutonic Knight (Teutons) |
 | T     | Purple | Samurai (Japanese)        |
 | J     | Blue   | Woad Raider (Celts)       |
-| L     | Orange | Longbowman (Britons)      |
+| L     | Orange | Huskarl (Goths)           |
 
 ## Game Tick Rate
 
@@ -168,10 +194,55 @@ The player's current score, level, and number of lines cleared are displayed on 
 
 ## Rotations
 
-The rotations array holds multiple coordinates as vectors.
+The rotations use the Super Rotation System described here: [https://tetris.wiki/Super_Rotation_System](https://tetris.wiki/Super_Rotation_System).
 
-```python
-xsArray[ROTATE_I_INDEX] = [facingI_U, facingI_R, facingI_D, facingI_L]
-facingI_U[CLOCKWISE] = [(0, 1), (0, -1), (0, 2), (1, -1), (-2, 1),]
-xsArray[ROTATE_X_INDEX] = [facingX_U, facingX_R, facingX_D, facingX_L]
-```
+## Data Mod
+
+Tetris is more fun with explosions.
+This data mod supports changing around unit data to allow for units to explode when they are removed from the game board.
+This mod must be selected in the single player menu when launching a game of Tetris.
+
+Note that the dat file is not contained in the GitHub repository, but may be obtained by downloading the `Tetris Scenario` mod in game and selecting the button to browse the mod's files.
+
+The data mod makes the following changes.
+
+The Selection Sound for the following buildings have been changed from their original value to `-1 - None`:
+
+* 49 - Siege Workshop
+* 82 - Castle
+* 87 - Archery Range
+* 101 - Stable
+* 103 - Blacksmith
+* 104 - Monastery
+* 209 - University
+* 1251 - Krepost
+
+The following units are modified:
+
+* 534 - Elite Woad Raider
+* 554 - Elite Teutonic Knight
+* 555 - Elite Huskarl
+* 560 - Elite Samurai
+* 694 - Elite Berserk
+* 726 - Elite Jaguar Warrior
+* 752 - Elite Eagle Warrior
+
+For both the Byzantines and Gaia, their attack graphics are set equal to their Dying and Undead Graphics.
+
+These graphics are modified to have an empty delta followed by an explosion Petard delta.
+The dying and undead graphics file are:
+
+* 826 - Huskarl (Death)
+* 1086 - Samurai (Death)
+* 1164 - TeutonicKnight (Death)
+* 1372 - WoadRaider (Death)
+* 4225 - EliteBerserk (Death)
+* 5783 - EliteEagleWarrior (Death)
+* 6600 - JaguarWarrior (Death)
+
+And finally, while this unit is not modified, it's important enough that we make note of it.
+
+* Explosion Petard - 12217
+
+In the game, each of those units, as well as the invisible object, for all players, are modified to have 100 range.
+They attack Fortified Walls, and these walls are healed when the units are stopped and replaced with invisible objects.
