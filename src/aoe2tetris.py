@@ -272,7 +272,13 @@ def _add_render_trigger_toggles(
         activator: The trigger to which the activate effects are appended.
         deactivator: The trigger to which the deactivate effects are appended.
     """
-    triggers = []
+    triggers = [
+        tdata.react_tetris,
+        tdata.react_hold,
+        tdata.react_hold_fail,
+        tdata.react_lock,
+        tdata.react_move,
+    ]
     for t in tdata.render_triggers.values():
         triggers.append(t)
     for next_list in tdata.render_next_triggers:
@@ -285,6 +291,32 @@ def _add_render_trigger_toggles(
         deactivator.add_effect(
             Effect.DEACTIVATE_TRIGGER, trigger_id=t.trigger_id
         )
+
+
+def _impl_reaction_sounds(tdata: TetrisData, xs: ScriptCaller):
+    """Implements the sounds that play in reaction to various game events."""
+    for trigger, xs_function, sound_name in [
+        (tdata.react_tetris, xs.can_react_tetris(), "PLAY_TAUNT_30"),
+        (tdata.react_move, xs.can_react_move(), "PLAY_VILLAGER_WOOD_CHOP"),
+        (tdata.react_hold, xs.can_react_hold(), "PLAY_VILLAGER_MINING"),
+        (tdata.react_hold_fail, xs.can_react_hold_fail(), "PLAY_ERROR"),
+        (tdata.react_lock, xs.can_react_lock(), "PLAY_WALL_SELECT"),
+        (
+            tdata._react_game_over,
+            xs.can_react_game_over(),
+            "PLAY_PLAYER_ELIMINATED",
+        ),
+        (
+            tdata._react_game_over_easter,
+            xs.can_react_game_over_easter(),
+            "PLAY_TAUNT_27",
+        ),
+    ]:
+        trigger.add_condition(Condition.SCRIPT_CALL, xs_function=xs_function)
+        trigger.add_effect(Effect.PLAY_SOUND, sound_name=sound_name)
+    tdata._react_game_over_easter.add_effect(
+        Effect.SCRIPT_CALL, message=xs.ack_game_over_easter()
+    )
 
 
 def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
@@ -354,6 +386,9 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     tdata.begin_game_end.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_loop.trigger_id
     )
+    tdata.begin_game_end.add_effect(
+        Effect.PLAY_SOUND, sound_name="PLAY_WONDER_STARTED"
+    )
 
 
 def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
@@ -406,27 +441,13 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.update.trigger_id
     )
 
-    # Update activates the render triggers, that way new game doesn't have to
-    # deactivate them.
     tdata.update.add_effect(Effect.SCRIPT_CALL, message=xs.update())
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.shuffle.trigger_id
     )
     tdata.shuffle.add_condition(Condition.SCRIPT_CALL, xs_function=xs.shuffle())
 
-    tdata.update.add_effect(
-        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.react_tetris.trigger_id
-    )
-    tdata.react_tetris.add_condition(
-        Condition.SCRIPT_CALL, xs_function=xs.can_react_tetris()
-    )
-    tdata.react_tetris.add_effect(
-        Effect.SCRIPT_CALL, message=xs.clear_react_tetris()
-    )
-    tdata.react_tetris.add_effect(Effect.PLAY_SOUND, sound_name="PLAY_TAUNT_30")
-    tdata.cleanup.add_effect(
-        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.react_tetris.trigger_id
-    )
+    _impl_reaction_sounds(tdata, xs)
 
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.game_over.trigger_id
@@ -447,6 +468,20 @@ def _impl_game_loop(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.can_begin.trigger_id
     )
     _add_render_trigger_toggles(tdata, tdata.update, tdata.cleanup)
+    tdata.game_over.add_effect(
+        Effect.ACTIVATE_TRIGGER, trigger_id=tdata.react_game_over.trigger_id
+    )
+    tdata.react_game_over.add_effect(
+        Effect.DEACTIVATE_TRIGGER,
+        trigger_id=tdata.react_game_over_easter.trigger_id,
+    )
+    tdata.game_over.add_effect(
+        Effect.ACTIVATE_TRIGGER,
+        trigger_id=tdata.react_game_over_easter.trigger_id,
+    )
+    tdata.react_game_over_easter.add_effect(
+        Effect.DEACTIVATE_TRIGGER, trigger_id=tdata.react_game_over.trigger_id
+    )
     tdata.update.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.cleanup.trigger_id
     )

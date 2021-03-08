@@ -182,15 +182,59 @@ class ScriptCaller:
         )
 
     def can_react_tetris(self) -> str:
-        """Returns a conditions string to check if a player scored a Tetris."""
+        """Returns a condition string to check if a player scored a Tetris."""
         return self._call_function("canReactTetris")
 
-    def clear_react_tetris(self) -> str:
+    def can_react_move(self) -> str:
+        """Returns a condition string to check if a Tetromino moved."""
+        return self._call_function("canReactMove")
+
+    def can_react_hold(self) -> str:
+        """Returns a condition string to check if a Tetromino was held."""
+        return self._call_function("canReactHold")
+
+    def can_react_hold_fail(self) -> str:
+        """Returns a condition string to check if a hold attempt failed."""
+        return self._call_function("canReactHoldFail")
+
+    def can_react_game_over(self) -> str:
+        """Returns a condition string to react to a game being over."""
+        return self._call_function("canReactGameOver")
+
+    def can_react_game_over_easter(self) -> str:
         """
-        Returns an effect string to signal that the game has responded to
-        a Tetris.
+        Returns a condition string to react to play an Easter Egg sound when
+        a game ends when the in-game time is over two hours.
         """
-        return self._call_function('clearReactTetris')
+        return self._call_function("canReactGameOverEasterEgg")
+
+    def ack_game_over_easter(self) -> str:
+        """Returns an effect string to acknowledge playing the Easter egg."""
+        return self._call_function("ackGameOverEasterEgg")
+
+    def can_react_lock(self) -> str:
+        """Returns a condition string to react to a Tetromino locking down."""
+        return self._call_function("canReactLockdown")
+
+    def can_explode(self, row: int) -> str:
+        """
+        Returns a condition string to check whether the row at index `row`
+        can explode.
+
+        Parameters:
+            row: The index of the row to explode. Required to be a visible row.
+        """
+        return self._call_function("canExplode", [str(row)])
+
+    def can_clear_explode(self, row: int) -> str:
+        """
+        Returns a condition string to check whether the row at index `row`
+        can clear its explosion state.
+
+        Parameters:
+            row: The index of the row to explode. Required to be a visible row.
+        """
+        return self._call_function("canClearExplode", [str(row)])
 
     def test(self) -> str:
         """Calls a string to call a test xs functions."""

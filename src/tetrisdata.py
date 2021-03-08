@@ -124,6 +124,9 @@ def _generate_game_board(
     return board
 
 
+# TODO generate the gaia fortified walls
+
+
 def _generate_next_units(
     mmgr: MMgr, umgr: UMgr, rows: int, cols: int, space_v: float, space_h: float
 ) -> List[DisplayBoard]:
@@ -356,6 +359,26 @@ def _declare_render_hold_triggers(tmgr: TMgr) -> HoldRenderTriggers:
     ]
 
 
+def _declare_explode_row_triggers(
+    tmgr: TMgr, rows: int, visible: int
+) -> Dict[int, TriggerObject]:
+    """Returns triggers for exploding rows with indices `visible:rows`."""
+    return {
+        r: tmgr.add_trigger(f"Explode Row {r}", enabled=False)
+        for r in range(visible, rows)
+    }
+
+
+def _declare_clear_row_triggers(
+    tmgr: TMgr, rows: int, visible: int
+) -> Dict[int, TriggerObject]:
+    """Returns triggers for exploding rows with indices `visible:rows`."""
+    return {
+        r: tmgr.add_trigger(f"Clear Row {r}", enabled=False)
+        for r in range(visible, rows)
+    }
+
+
 class TetrisData:
     """
     An instance represents the trigger declarations and units for Tetris.
@@ -429,11 +452,29 @@ class TetrisData:
         self._update = tmgr.add_trigger("Update", enabled=False)
         self._shuffle = tmgr.add_trigger("Activate Shuffle", enabled=False)
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
+
+        tmgr.add_trigger("-- Rendering --")
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
         self._render_next_triggers = _declare_render_next_triggers(tmgr)
         self._render_hold_triggers = _declare_render_hold_triggers(tmgr)
+        self._explode_rows = _declare_explode_row_triggers(tmgr, rows, visible)
+        self._clear_rows = _declare_clear_row_triggers(tmgr, rows, visible)
         self._react_tetris = tmgr.add_trigger("React Tetris", enabled=False)
+        self._react_move = tmgr.add_trigger("React Move", enabled=False)
+        self._react_hold = tmgr.add_trigger("React Hold", enabled=False)
+        self._react_hold_fail = tmgr.add_trigger(
+            "React Hold Fail", enabled=False
+        )
+        self._react_lock = tmgr.add_trigger("React Lock", enabled=False)
         self._game_over = tmgr.add_trigger("Game Over", enabled=False)
+        self._react_game_over = tmgr.add_trigger(
+            "React Game Over", enabled=False
+        )
+        self._react_game_over_easter = tmgr.add_trigger(
+            "React Game Over Easter Egg", enabled=False
+        )
+
+        tmgr.add_trigger("-- Ending Game Loop --")
         self._cleanup = tmgr.add_trigger("Cleanup", enabled=False)
         self._begin_game_end = tmgr.add_trigger("Begin Game End", enabled=False)
 
@@ -579,3 +620,50 @@ class TetrisData:
     def react_tetris(self) -> TriggerObject:
         """Returns a trigger to react to a player's clearing 4 lines."""
         return self._react_tetris
+
+    @property
+    def explode_rows(self) -> Dict[int, TriggerObject]:
+        """
+        Returns triggers for exploding rows with indices in `visible:rows`.
+        """
+        return self._explode_rows
+
+    @property
+    def clear_explodes(self) -> Dict[int, TriggerObject]:
+        """
+        Returns triggers for clearing exploding rows with indices in
+        `visible:rows`.
+        """
+        return self._clear_rows
+
+    @property
+    def react_move(self) -> TriggerObject:
+        """Returns a trigger to react to a Tetromino successfully moving."""
+        return self._react_move
+
+    @property
+    def react_hold(self) -> TriggerObject:
+        """Returns a trigger to react to a Tetromino being held."""
+        return self._react_hold
+
+    @property
+    def react_hold_fail(self) -> TriggerObject:
+        """Returns a trigger to react to a Tetromino failing to be held."""
+        return self._react_hold_fail
+
+    @property
+    def react_lock(self) -> TriggerObject:
+        """Returns a trigger to react to a Tetromino being locked."""
+        return self._react_lock
+
+    @property
+    def react_game_over(self) -> TriggerObject:
+        """Returns a trigger to react to the game being over."""
+        return self._react_game_over
+
+    @property
+    def react_game_over_easter(self) -> TriggerObject:
+        """
+        Returns a trigger to react to the game being over with an Easter egg.
+        """
+        return self._react_game_over_easter
