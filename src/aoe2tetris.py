@@ -52,6 +52,10 @@ SQUARE_SPACE_H = 0.9  # The amount of horizontal space between columns.
 BUILDING_X = 2  # The x-coordinate to place "select all hotkey" buildings.
 BUILDING_Y = 2  # The y-coordinate to place "select all hotkey" buildings.
 
+
+PLACEHOLDER = Unit.INVISIBLE_OBJECT  # The unit used for board tiles.
+
+
 # Maps a player slot to the string name of that player's color.
 PLAYER_COLOR_NAMES = {
     Player.TWO: "Red",
@@ -118,7 +122,7 @@ def _impl_range(tdata: TetrisData):
     """
     for p in PLAYERS:
         for t in range(Tetromino.num() + 1):
-            u = Tetromino.from_int(t).unit if t else Unit.INVISIBLE_OBJECT
+            u = Tetromino.from_int(t).unit if t else PLACEHOLDER
             tdata.init_scenario.add_effect(
                 Effect.MODIFY_ATTRIBUTE,
                 quantity=100,
@@ -202,7 +206,7 @@ def _impl_render_triggers(tdata: TetrisData, xs: ScriptCaller):
             xs_function=xs.can_render_tile(index, d, t),
         )
         p = t.player.value if t else Player.GAIA
-        u = t.unit if t else Unit.INVISIBLE_OBJECT
+        u = t.unit if t else PLACEHOLDER
         tile = tdata.board[index]
         assert tile is not None
         unit_object = tile[d]
@@ -238,7 +242,7 @@ def _impl_render_next_triggers(tdata: TetrisData, xs: ScriptCaller):
             trigger.add_effect(
                 Effect.REPLACE_OBJECT,
                 target_player=Player.GAIA,
-                object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+                object_list_unit_id_2=PLACEHOLDER,
                 selected_object_ids=gaia_ids,
             )
 
@@ -254,7 +258,7 @@ def _impl_render_hold_triggers(tdata: TetrisData, xs: ScriptCaller):
     renderInvisible.add_effect(
         Effect.REPLACE_OBJECT,
         target_player=Player.GAIA,
-        object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+        object_list_unit_id_2=PLACEHOLDER,
         selected_object_ids=list(all_unit_ids),
     )
 
@@ -276,7 +280,7 @@ def _impl_render_hold_triggers(tdata: TetrisData, xs: ScriptCaller):
         trigger.add_effect(
             Effect.REPLACE_OBJECT,
             target_player=Player.GAIA,
-            object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+            object_list_unit_id_2=PLACEHOLDER,
             selected_object_ids=gaia_ids,
         )
 
@@ -316,7 +320,7 @@ def _impl_explosion_triggers(tdata: TetrisData, xs: ScriptCaller):
                 clear.add_effect(
                     Effect.REPLACE_OBJECT,
                     target_player=Player.GAIA,
-                    object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+                    object_list_unit_id_2=PLACEHOLDER,
                     selected_object_ids=[attacker.reference_id],
                 )
 

@@ -48,6 +48,9 @@ FORAGE_BUSH = 59
 MAP_REVEALER = 837
 
 
+PLACEHOLDER = Unit.INVISIBLE_OBJECT  # The unit used for board tiles.
+
+
 DIRECTIONS = list(Direction)  # List of all possible facing directions.
 TETROMINOS = list(Tetromino)  # List of all Tetris pieces.
 
@@ -116,7 +119,7 @@ def _generate_game_board(
                 assert board[Index(r, c)] is not None
                 board[Index(r, c)][d] = umgr.add_unit(  # type: ignore
                     player=Player.ONE,
-                    unit_const=Unit.INVISIBLE_OBJECT,
+                    unit_const=PLACEHOLDER,
                     x=x,
                     y=y,
                     rotation=d.facing,
@@ -145,7 +148,7 @@ def _generate_walls(
     walls = {}
     for d in (Direction.U, Direction.D):
         walls[d] = [None] * cols
-        r = -20 if d == Direction.U else 80
+        r = -20 if d == Direction.D else 80
         for c in range(cols):
             x, y = rotate(r, c)
             walls[d][c] = umgr.add_unit(
@@ -157,7 +160,7 @@ def _generate_walls(
     for d in (Direction.L, Direction.R):
         num_rows = rows - visible
         walls[d] = [None] * num_rows
-        c = -40 if d == Direction.L else 50
+        c = -40 if d == Direction.R else 50
         for r in range(visible, rows):
             x, y = rotate(r, c)
             walls[d][r - visible] = umgr.add_unit(
@@ -190,7 +193,7 @@ def _generate_next_units(
                 board_row.append(
                     umgr.add_unit(
                         player=Player.ONE,
-                        unit_const=Unit.INVISIBLE_OBJECT,
+                        unit_const=PLACEHOLDER,
                         x=x,
                         y=y,
                         rotation=Direction.U.facing,
@@ -217,7 +220,7 @@ def _generate_hold_units(
             row.append(
                 umgr.add_unit(
                     player=Player.ONE,
-                    unit_const=Unit.INVISIBLE_OBJECT,
+                    unit_const=PLACEHOLDER,
                     x=x,
                     y=y,
                     rotation=Direction.U.facing,
