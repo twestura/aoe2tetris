@@ -29,6 +29,8 @@ The mod will have a green check mark next to it when it finishes downloading.
 Then search for and subscribe to "Tetris Visual Mod".
 Turn this mod on when playing Tetris and off when playing other games.
 
+![image](images/browse-mods.png)
+
 **Setup hotkeys.**
 From Aoe2 DE's main menu, click the gear icon in the top right.
 Then select Options.
@@ -80,7 +82,7 @@ The "Speed Game Up" and "Slow Game Down" hotkeys from the "Game Commands" hotkey
 Thanks to Among the Hidden for making the video "A Game of Tetris" that inspired this idea.
 Go check out that video: [https://youtu.be/p_sSYYaWJ3k](https://youtu.be/p_sSYYaWJ3k)
 
-Thanks also to MrKirby and Alian713 for helping with the parsing library I used to generate the scenario files.
+Thanks also to Alian713 and to MrKirby for helping with the parsing library I used to generate the scenario files.
 Check out the library here: [https://github.com/KSneijders/AoE2ScenarioParser](https://github.com/KSneijders/AoE2ScenarioParser)
 
 ## Implementation Details
