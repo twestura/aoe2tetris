@@ -9,9 +9,10 @@ To play Tetris, you must:
 
 1. Enable x8 speed.
 2. Subscribe to the mods.
-3. Setup hotkeys.
-4. Select both the scenario and the data mod when launching the game.
-5. Set the game speed to x8.
+3. Setup the xs file.
+4. Setup hotkeys.
+5. Select both the scenario and the data mod when launching the game.
+6. Set the game speed to x8.
 
 **Enable x8 speed.**
 Right click Aoe2 DE in your Steam library.
@@ -39,6 +40,12 @@ From the Hotkeys tab, use the dropdown menu on the right side to add a new hotke
 Remember to switch back to your normal hotkey profile when finished playing Tetris.
 
 ![image](images/hotkey-profile.png)
+
+**Setup the xs file.** The mod center currently does not install xs scripts (a new scenario feature) correctly, so you'll have to copy and paste the file into the correct folder.
+Once the Tetris mod is downloaded, select it an click "Open Directory".
+Inside of the xs folder is a file `tetris.xs`.
+Now right click Aoe2DE in your Steam library and go to Manage > Browse Local Files.
+Copy `tetris.xs` and paste it into `<your-aoe2-folder>\resources\_common\xs`.
 
 **Launch the game.**
 The scenario is launched by starting a single player game.
