@@ -32,9 +32,10 @@ Turn this mod on when playing Tetris and off when playing other games.
 ![image](images/browse-mods.png)
 
 **Setup hotkeys.**
+
 From Aoe2 DE's main menu, click the gear icon in the top right.
 Then select Options.
-From the Hotkeys tab, use the dropdown menu on the right side to select the Tetris hotkey profile (this profile is installed when you subscribe to the Tetris mod).
+From the Hotkeys tab, use the dropdown menu on the right side to add a new hotkeys profile (see the Recommended Hotkeys section that follows).
 Remember to switch back to your normal hotkey profile when finished playing Tetris.
 
 ![image](images/hotkey-profile.png)
