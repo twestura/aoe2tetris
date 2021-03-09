@@ -115,6 +115,12 @@ const int HARD_DROP_MULTIPLIER = 2;
 /// The number of lines to clear in order to level up.
 const int LINES_PER_LEVEL = 10;
 
+/// The number of game ticks to delay while watching Tetrominos explode.
+const int EXPLODE_DELAY = 8;
+
+/// The number of seconds in two hours.
+const int TWO_HOURS = 7200;
+
 // =============================================================================
 // Mutable Globals
 // =============================================================================
@@ -184,11 +190,50 @@ int prevHeld = 0;
 
 /// The time remaining before the active tetromino is moved down automatically.
 /// Nonnegative.
+/// At most one timer is nonzero.
 int timer = 0;
 
 /// `true` if the player has cleared 4 rows, `false` otherwise.
 /// Signals the game to react to the event of scoring a Tetris.
 bool reactTetris = false;
+
+/// Timer to count down the number of seconds remaining until an exploded row
+/// is cleared of explosions.
+/// Nonnegative.
+/// At most one timer is nonzero.
+int explodeTimer = 0;
+
+/// `true` to pause for 1 tick after locking down a Tetromino, `false` if not
+/// to pause.
+bool placePause = false;
+
+/// Signal flag to react to a successful move.
+/// `true` if the reaction should be played during the current game tick,
+/// `false` if not.
+bool hasMoved = false;
+
+/// Signal flag to react to a hold.
+/// `true` if the reaction should be played during the current game tick,
+/// `false` if not.
+bool hasHeld = false;
+
+/// Signal flag to react to a failed hold.
+/// `true` if the reaction should be played during the current game tick,
+/// `false` if not.
+bool hasFailedHold = false;
+
+/// Array Id of the signal array for exploding a row.
+int explodeArrayId = 0;
+
+/// Array Id of the signal array for clearing the explosions.
+int clearExplodeArrayId = 0;
+
+/// `true` if the 2 hour Easter egg has played, `false` otherwise.
+bool hasPlayedEasterEgg = false;
+
+/// `true` if a Tetromino locked down on the current game tick,
+/// `false` otherwise.
+bool hasLockedDown = false;
 
 // =============================================================================
 // Utility Functions
@@ -1087,6 +1132,62 @@ int _testRotations(int r = 0) {
 }
 
 // =============================================================================
+// Explosion Array
+// =============================================================================
+
+/// Initializes the `explode` and `clearExplode` arrays.
+void _initExplosionArrays() {
+    explodeArrayId = xsArrayCreateBool(VISIBLE, false, "Explode Signal Array");
+    clearExplodeArrayId = xsArrayCreateBool(
+        VISIBLE, false, "Clear Explode Signal Array"
+    );
+}
+
+/// Returns `row` translated from the intervale `20..40` to `0..20`.
+/// Requires `row in 20..40`.
+int _rowToExplode(int row = 0) {
+    return (row - VISIBLE);
+}
+
+/// Sets the row at index `row` to react to an explosion during the current
+/// game tick.
+void _setExplode(int row = 0) {
+    xsArraySetBool(explodeArrayId, _rowToExplode(row), true);
+}
+
+/// Returns `true` if the row at index `row` can start exploding during the
+/// current game tick.
+bool canExplode(int row = 0) {
+    return (xsArrayGetBool(explodeArrayId, _rowToExplode(row)));
+}
+
+/// Sets the row at index `row` to stop exploding during the current
+/// game tick.
+void _setClearExplode(int row = 0) {
+    xsArraySetBool(clearExplodeArrayId, _rowToExplode(row), true);
+}
+
+/// Returns `true` if the row at index `row` can stop exploding during the
+/// current game tick.
+bool canClearExplode(int row = 0) {
+    if (explodeTimer != 1) {
+        return (false);
+    }
+    return (xsArrayGetBool(clearExplodeArrayId, _rowToExplode(row)));
+}
+
+/// Sets all values in the `explode` and `clearExplode` arrays to `false`.
+void _clearExplodeArrays() {
+    for (row = VISIBLE; < TETRIS_ROWS) {
+        int r = _rowToExplode(row);
+        xsArraySetBool(explodeArrayId, r, false);
+        if (explodeTimer == 0) {
+            xsArraySetBool(clearExplodeArrayId, r, false);
+        }
+    }
+}
+
+// =============================================================================
 // Scenario Initialization
 // =============================================================================
 
@@ -1097,8 +1198,10 @@ void initXsState() {
     _initSequence();
     _initOffsetArrays();
     _initRotationArrays();
+    _initExplosionArrays();
     prevHeld = 0;
     heldTetromino = 0;
+    hasPlayedEasterEgg = false;
 }
 
 // =============================================================================
@@ -1118,6 +1221,7 @@ void beginGame() {
     _resetTimer(LEVEL_INIT);
     _clearBoard();
     _clearUpdate();
+    _clearExplodeArrays();
     for (k = 0; < NUM_TETROMINOS) {
         _setSequence(k, k + 1);
         _setSequence(k + NUM_TETROMINOS, k + 1);
@@ -1130,6 +1234,13 @@ void beginGame() {
     isHoldLegal = true;
     prevHeld = heldTetromino;
     heldTetromino = 0;
+    explodeTimer = 0;
+    placePause = false;
+    reactTetris = false;
+    hasMoved = false;
+    hasHeld = false;
+    hasFailedHold = false;
+    hasLockedDown = false;
 }
 
 /// Initializes the state necessary for placing a Tetromino on the board.
@@ -1180,7 +1291,12 @@ void initGameLoop() {
     renderNext = false;
     renderHold = false;
     reactTetris = false;
+    hasMoved = false;
+    hasHeld = false;
+    hasFailedHold = false;
+    hasLockedDown = false;
     _setAllUpdate(false);
+    _clearExplodeArrays();
 }
 
 /// Returns `true` if the selected action is to start a new game.
@@ -1202,9 +1318,11 @@ bool _canTranslate(int dr = 0, int dc = 0) {
     int offsetArrayId = _getOffsets(_activeTetromino());
     for (k = 0; < NUM_TILES) {
         Vector v = xsArrayGetVector(offsetArrayId, k);
-        Vector v2 = _rotateVector(v, activeFacing);
-        int r = xsVectorGetX(v2) + activeRow + dr;
-        int c = xsVectorGetY(v2) + activeCol + dc;
+        if (_activeTetromino() != O) {
+            v = _rotateVector(v, activeFacing);
+        }
+        int r = xsVectorGetX(v) + activeRow + dr;
+        int c = xsVectorGetY(v) + activeCol + dc;
         if (_isInBoundsAndEmpty(r, c) == false) {
             return (false);
         }
@@ -1275,14 +1393,16 @@ bool _canHold() {
 ///     dr: The row offset by which to translate the active Tetromino.
 ///     dc: The column offset by which to translate the active Tetromino.
 void _translatePosition(int dr  = 0, int dc = 0) {
-        int offsetArrayId = _getOffsets(_activeTetromino());
         int t = _activeTetromino();
+        int offsetArrayId = _getOffsets(t);
         // Sets the currently active tiles to be rendered as Invisible Objects.
         for (k0 = 0; < NUM_TILES) {
-            Vector v = xsArrayGetVector(offsetArrayId, k0);
-            Vector vRotated = _rotateVector(v, activeFacing);
-            int r0 = xsVectorGetX(vRotated) + activeRow;
-            int c0 = xsVectorGetY(vRotated) + activeCol;
+            Vector v0 = xsArrayGetVector(offsetArrayId, k0);
+            if (t != O) {
+                v0 = _rotateVector(v0, activeFacing);
+            }
+            int r0 = xsVectorGetX(v0) + activeRow;
+            int c0 = xsVectorGetY(v0) + activeCol;
             _setUpdateValue(r0, c0, activeFacing, 0, true);
         }
         // Sets the newly active tiles to be rendered as units.
@@ -1290,9 +1410,11 @@ void _translatePosition(int dr  = 0, int dc = 0) {
         // from the previous loop.
         for (k1 = 0; < NUM_TILES) {
             Vector v1 = xsArrayGetVector(offsetArrayId, k1);
-            Vector v1Rotated = _rotateVector(v1, activeFacing);
-            int r1 = xsVectorGetX(v1Rotated) + activeRow;
-            int c1 = xsVectorGetY(v1Rotated) + activeCol;
+            if (t != O) {
+                v1 = _rotateVector(v1, activeFacing);
+            }
+            int r1 = xsVectorGetX(v1) + activeRow;
+            int c1 = xsVectorGetY(v1) + activeCol;
             _setUpdateValue(r1 + dr, c1 + dc, activeFacing, 0, false);
             _setUpdateValue(r1 + dr, c1 + dc, activeFacing, t, true);
         }
@@ -1350,8 +1472,10 @@ bool _canDrop(int r = 0) {
     // row of its indices.
     int dr = r - activeRow;
     for (k = 0; < NUM_TILES) {
-        Vector vUp = xsArrayGetVector(offsetsId, k);
-        Vector v = _rotateVector(vUp, activeFacing);
+        Vector v = xsArrayGetVector(offsetsId, k);
+        if (_activeTetromino() != O) {
+            v = _rotateVector(v, activeFacing);
+        }
         int row = activeRow + xsVectorGetX(v) + dr;
         int col = activeCol + xsVectorGetY(v);
         if (_isInBoundsAndEmpty(row, col) == false) {
@@ -1405,28 +1529,45 @@ void _updateScore(int numCleared = 0) {
         difficult = newDifficult;
 }
 
+/// Checks if any lines are cleared, and if so, explodes them.
+/// Returns the number of lines cleared.
+int _checkClearLines() {
+    int numCleared = 0;
+    int row = TETRIS_ROWS - 1;
+    int filled = _numFilled(row);
+    while (row > 0 && numCleared < 4 && filled > 0) {
+        if (filled == TETRIS_COLS) {
+            numCleared++;
+            _setExplode(row);
+            _setClearExplode(row);
+        }
+        row--;
+        filled = _numFilled(row);
+    }
+    if (numCleared == 4) {
+        reactTetris = true;
+    }
+    _updateScore(numCleared);
+    return (numCleared);
+}
+
 /// Clears lines and updates the game score after a Tetromino is locked
 /// on the board.
 void _clearLines() {
-        int numCleared = 0;
-        int row = TETRIS_ROWS - 1;
-        while (row > 0 && numCleared < 4) {
-            int filled = _numFilled(row);
-            if (filled == 0) {
-                break;
-            }
-            if (filled == TETRIS_COLS) {
-                _moveRowsDown(row);
-                numCleared++;
-            } else {
-                row--;
-            }
+    int numCleared = 0;
+    int row = TETRIS_ROWS - 1;
+    while (row > 0 && numCleared < 4) {
+        int filled = _numFilled(row);
+        if (filled == 0) {
+            break;
         }
-        if (numCleared == 4) {
-            reactTetris = true;
+        if (filled == TETRIS_COLS) {
+            _moveRowsDown(row);
+            numCleared++;
+        } else {
+            row--;
         }
-        // TODO make pieces explode or something fun
-        _updateScore(numCleared);
+    }
 }
 
 /// Sets the update array to replace the rendering of the active tetromino
@@ -1434,8 +1575,10 @@ void _clearLines() {
 void _clearActiveTetrominoRender() {
         int offsetsId = _getOffsets(_activeTetromino());
         for (k = 0; < NUM_TILES) {
-            Vector vUp = xsArrayGetVector(offsetsId, k);
-            Vector v = _rotateVector(vUp, activeFacing);
+            Vector v = xsArrayGetVector(offsetsId, k);
+            if (_activeTetromino() != O) {
+                v = _rotateVector(v, activeFacing);
+            }
             int r = xsVectorGetX(v) + activeRow;
             int c = xsVectorGetY(v) + activeCol;
             _setUpdateValue(r, c, activeFacing, 0, true);
@@ -1506,77 +1649,116 @@ void _lockDown(int numRows = 0) {
     _clearActiveTetrominoRender();
     // Sets the update array to render the new position.
     for (k = 0; < NUM_TILES) {
-        Vector vUp = xsArrayGetVector(offsetsId, k);
-        Vector v = _rotateVector(vUp, activeFacing);
+        Vector v = xsArrayGetVector(offsetsId, k);
+        if (_activeTetromino() != O) {
+            v = _rotateVector(v, activeFacing);
+        }
         int r = xsVectorGetX(v) + activeRow + numRows;
         int c = xsVectorGetY(v) + activeCol;
         _setUpdateValue(r, c, activeFacing, 0, false);
         _setUpdateValue(r, c, activeFacing, _activeTetromino(), true);
         _setBoardValue(r, c, activeFacing, _activeTetromino());
     }
-    activeRow = activeRow + numRows;
-    _clearLines();
     isHoldLegal = true;
-    _spawnNextTetromino();
+    hasLockedDown = true;
+    activeRow = activeRow + numRows;
+    int numCleared = _checkClearLines();
+    if (numCleared > 0) {
+        explodeTimer = EXPLODE_DELAY;
+    } else {
+        placePause = true;
+    }
 }
 
 /// Updates the game state.
 /// Call in a trigger after storing user input in the `Selected` variable
 /// and before executing the render triggers.
 void update() {
-    if (_canMoveLeft()) {
-        _translatePosition(0, -1);
-        timer = 1;
-    } else if (_canMoveRight()) {
-        _translatePosition(0, 1);
-        timer = 1;
-    } else if (_canRotateClockwise()) {
-        _rotatePosition(CLOCKWISE);
-        timer = 1;
-    } else if (_canRotateCounterclockwise()) {
-        _rotatePosition(COUNTERCLOCKWISE);
-        timer = 1;
-    } else if (_canSoftDrop()) {
-        _translatePosition(1, 0);
-        int scoreSoft = xsTriggerVariable(SCORE_ID);
-        int levelSoft = xsTriggerVariable(LEVEL_ID);
-        xsSetTriggerVariable(
-            SCORE_ID, scoreSoft + SOFT_DROP_MULTIPLIER * levelSoft
-        );
-        _resetTimer(levelSoft);
-    } else if (_canHardDrop()) {
-        int numRows = _numDropRows();
-        xsSetTriggerVariable(
-            SCORE_ID,
-            xsTriggerVariable(SCORE_ID)
-            + HARD_DROP_MULTIPLIER
-            * xsTriggerVariable(LEVEL_ID)
-            * numRows
-        );
-        _lockDown(numRows);
-    } else if (_canHold()) {
-        _clearActiveTetrominoRender();
-        prevHeld = heldTetromino;
-        heldTetromino = _activeTetromino();
-        if (prevHeld != 0) {
-            _setSequence(tetrominoSeqIndex, prevHeld);
-            tetrominoSeqIndex = tetrominoSeqIndex - 1;
-        }
-        isHoldLegal = false;
-        renderHold = true;
+    if (placePause) {
+        placePause = false;
         _spawnNextTetromino();
-    }
-    if (timer == 0) {
-        if (_canTranslate(1, 0)) {
-            _translatePosition(1, 0);
-            _resetTimer(xsTriggerVariable(LEVEL_ID));
-        } else {
-            _lockDown(0);
-        }
+    } else if (explodeTimer > 1) {
+        explodeTimer--;
+    } else if (explodeTimer == 1) {
+        explodeTimer--;
+        _clearLines();
+        _spawnNextTetromino();
     } else {
-        timer = timer - 1;
+        if (_canMoveLeft()) {
+            _translatePosition(0, -1);
+            hasMoved = true;
+            if (timer == 0) {
+                timer = 1;
+            }
+        } else if (_canMoveRight()) {
+            _translatePosition(0, 1);
+            hasMoved = true;
+            if (timer == 0) {
+                timer = 1;
+            }
+        } else if (_canRotateClockwise()) {
+            // TODO fix O rotations
+            _rotatePosition(CLOCKWISE);
+            hasMoved = true;
+            if (timer == 0) {
+                timer = 1;
+            }
+        } else if (_canRotateCounterclockwise()) {
+            _rotatePosition(COUNTERCLOCKWISE);
+            hasMoved = true;
+            if (timer == 0) {
+                timer = 1;
+            }
+        } else if (_canSoftDrop()) {
+            _translatePosition(1, 0);
+            int scoreSoft = xsTriggerVariable(SCORE_ID);
+            int levelSoft = xsTriggerVariable(LEVEL_ID);
+            xsSetTriggerVariable(
+                SCORE_ID, scoreSoft + SOFT_DROP_MULTIPLIER * levelSoft
+            );
+            hasMoved = true;
+            _resetTimer(levelSoft);
+        } else if (_canHardDrop()) {
+            int numRows = _numDropRows();
+            xsSetTriggerVariable(
+                SCORE_ID,
+                xsTriggerVariable(SCORE_ID)
+                + HARD_DROP_MULTIPLIER
+                * xsTriggerVariable(LEVEL_ID)
+                * numRows
+            );
+            _lockDown(numRows);
+        } else if (_canHold()) {
+            _clearActiveTetrominoRender();
+            prevHeld = heldTetromino;
+            heldTetromino = _activeTetromino();
+            if (prevHeld != 0) {
+                _setSequence(tetrominoSeqIndex, prevHeld);
+                tetrominoSeqIndex = tetrominoSeqIndex - 1;
+            }
+            isHoldLegal = false;
+            hasHeld = true;
+            renderHold = true;
+            _spawnNextTetromino();
+        } else if (gameOver == false && selected == HOLD && isHoldLegal == false) {
+            hasFailedHold = true;
+        }
+        if (timer == 0) {
+            if (_canTranslate(1, 0)) {
+                _translatePosition(1, 0);
+                _resetTimer(xsTriggerVariable(LEVEL_ID));
+            } else {
+                _lockDown(0);
+            }
+        } else {
+            timer = timer - 1;
+        }
     }
 }
+
+// =============================================================================
+// Rendering and Reactions
+// =============================================================================
 
 /// Returns `true` if the tile at position `(row, col)` facing direction `d`
 /// can be rendered with a Tetromino of shape `t`.
@@ -1628,16 +1810,52 @@ bool canRenderHold(int t = 0) {
     return (heldTetromino == t && prevHeld != t);
 }
 
-/// Returns `true` if a player score's a Tetris on this game tick.
+/// Returns `true` if a player scores a Tetris on this game tick.
 bool canReactTetris() {
     return (reactTetris);
 }
 
-/// Acknowledges that the game has reacted to a Tetris.
-void clearReactTetris() {
-    reactTetris = false;
+/// Returns `true` if the game can react to a move action on this game tick.
+bool canReactMove() {
+    return (hasMoved);
+}
+
+/// Returns `true` if the game can react to a hold action on this game tick.
+bool canReactHold() {
+    return (hasHeld);
+}
+
+/// Returns `true` if the game can react to a failed hold action on this game
+/// tick.
+bool canReactHoldFail() {
+    return (hasFailedHold);
+}
+
+/// Returns `true` if the game can react to the game ending on this game tick.
+bool canReactGameOver() {
+    return (gameOver && (xsGetTime() < TWO_HOURS || hasPlayedEasterEgg));
+}
+
+/// Returns `true` if the game can react to the game ending on this game tick
+/// by using a special easter-egg reaction.
+bool canReactGameOverEasterEgg() {
+    return (
+        gameOver && hasPlayedEasterEgg == false && xsGetTime() >= TWO_HOURS
+    );
+}
+
+/// Acknowledges that the game has reacted to an Easter Egg game over.
+void ackGameOverEasterEgg() {
+    hasPlayedEasterEgg = true;
+}
+
+/// Returns `true` if the game can react to a Tetromino locking down on this
+/// game tick, `false` if not.
+bool canReactLockdown() {
+    return (hasLockedDown);
 }
 
 /// Scratch test function.
 void test() {
+
 }

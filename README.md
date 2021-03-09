@@ -5,25 +5,31 @@ The download link will be available on [https://www.ageofempires.com/mods](https
 
 ## Installation and Setup
 
-<!-- TODO separate visual mod to remove the gaia selection noises. -->
-
 To play Tetris, you must:
 
-1. Subscribe to the mod.
+0. Enable x8 speed.
+1. Subscribe to the mods.
 2. Setup hotkeys.
 3. Select both the scenario and the data mod.
 
-**Subscribe to the mod.**
+**Enable x8 speed.**
+Right click Aoe2 DE in your Steam library.
+Select Properties.
+In the Launch Option textbox, type `DEBUGSPEEDS`.
+
+**Subscribe to the mods.**
 From Aoe2 DE's main menu, click the gear icon in the top right.
 Then select Mods.
 From the Browse Mods tab, search for "Tetris".
 Select the mod and click Subscribe.
 The mod will have a green check mark next to it when it finishes downloading.
+Then search for and subscribe to "Tetris Visual Mod".
+Turn this mod on when playing Tetris and off when playing other games.
 
 **Setup hotkeys.**
 From Aoe2 DE's main menu, click the gear icon in the top right.
 Then select Options.
-From the Hotkeys tab, use the dropdown menu on the right side to select the Tetris hotkey profile.
+From the Hotkeys tab, use the dropdown menu on the right side to select the Tetris hotkey profile (this profile is installed when you subscribe to the Tetris mod).
 Remember to switch back to your normal hotkey profile when finished playing Tetris.
 
 **Launch the game.**
@@ -230,15 +236,16 @@ The following units are modified:
 For both the Byzantines and Gaia, their attack graphics are set equal to their Dying and Undead Graphics.
 
 These graphics are modified to have an empty delta followed by an explosion Petard delta.
+The animation duration of each of these animations also is doubled.
 The dying and undead graphics file are:
 
-* 826 - Huskarl (Death)
-* 1086 - Samurai (Death)
-* 1164 - TeutonicKnight (Death)
-* 1372 - WoadRaider (Death)
-* 4225 - EliteBerserk (Death)
-* 5783 - EliteEagleWarrior (Death)
-* 6600 - JaguarWarrior (Death)
+* 826 - Huskarl (Death), 1.25 -> 2.5
+* 1086 - Samurai (Death), 1.5 -> 3
+* 1164 - TeutonicKnight (Death), 1.5 -> 3
+* 1372 - WoadRaider (Death), 1.2 -> 2.4
+* 4225 - EliteBerserk (Death), 1 -> 2
+* 5783 - EliteEagleWarrior (Death), 1.25 -> 2.5
+* 6600 - JaguarWarrior (Death), 1.25 -> 2.5
 
 And finally, while this unit is not modified, it's important enough that we make note of it.
 

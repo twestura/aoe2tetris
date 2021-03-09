@@ -2,7 +2,7 @@
 
 
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 from AoE2ScenarioParser.datasets.buildings import Building, building_names
 from AoE2ScenarioParser.datasets.players import Player
 from AoE2ScenarioParser.datasets.units import Unit
@@ -124,7 +124,49 @@ def _generate_game_board(
     return board
 
 
-# TODO generate the gaia fortified walls
+def _generate_walls(
+    mmgr: MMgr,
+    umgr: UMgr,
+    rows: int,
+    cols: int,
+    visible: int,
+    space_v: float,
+    space_h: float,
+) -> Dict[Direction, List[Unit]]:
+    """
+    Returns the fortified wall objects used as targets for exploding rows.
+    """
+
+    def rotate(r: int, c: int) -> Tuple[float, float]:
+        return _rotate_unit_coordinates(
+            mmgr, rows, cols, space_v, space_h, r, c
+        )
+
+    walls = {}
+    for d in (Direction.U, Direction.D):
+        walls[d] = [None] * cols
+        r = -20 if d == Direction.U else 80
+        for c in range(cols):
+            x, y = rotate(r, c)
+            walls[d][c] = umgr.add_unit(
+                player=Player.GAIA,
+                unit_const=Building.FORTIFIED_WALL,
+                x=x,
+                y=y,
+            )
+    for d in (Direction.L, Direction.R):
+        num_rows = rows - visible
+        walls[d] = [None] * num_rows
+        c = -40 if d == Direction.L else 50
+        for r in range(visible, rows):
+            x, y = rotate(r, c)
+            walls[d][r - visible] = umgr.add_unit(
+                player=Player.GAIA,
+                unit_const=Building.FORTIFIED_WALL,
+                x=x,
+                y=y,
+            )
+    return walls
 
 
 def _generate_next_units(
@@ -406,6 +448,7 @@ class TetrisData:
         `building_x` is the x tile coordinate for spawning selection buildings.
         `building_y` is the y tile coordinate for spawning selection buildings.
         """
+        self._visible = visible
         rev_len = mmgr.map_width // 2
         rev_offset = 15
         for x in range(rev_len - rev_offset, rev_len + rev_offset + 1):
@@ -417,6 +460,9 @@ class TetrisData:
         _place_invisible_objects(umgr)
         self._hotkeys = HotkeyBuildings(umgr, building_x, building_y)
         self._board = _generate_game_board(
+            mmgr, umgr, rows, cols, visible, space_v, space_h
+        )
+        self._walls = _generate_walls(
             mmgr, umgr, rows, cols, visible, space_v, space_h
         )
         self._next_units = _generate_next_units(
@@ -454,11 +500,11 @@ class TetrisData:
         self._seq_init1 = _declare_sequence_init(tmgr, "Init b")
 
         tmgr.add_trigger("-- Rendering --")
+        self._clear_rows = _declare_clear_row_triggers(tmgr, rows, visible)
         self._render_triggers = _declare_render_triggers(tmgr, rows, cols)
         self._render_next_triggers = _declare_render_next_triggers(tmgr)
         self._render_hold_triggers = _declare_render_hold_triggers(tmgr)
         self._explode_rows = _declare_explode_row_triggers(tmgr, rows, visible)
-        self._clear_rows = _declare_clear_row_triggers(tmgr, rows, visible)
         self._react_tetris = tmgr.add_trigger("React Tetris", enabled=False)
         self._react_move = tmgr.add_trigger("React Move", enabled=False)
         self._react_hold = tmgr.add_trigger("React Hold", enabled=False)
@@ -667,3 +713,18 @@ class TetrisData:
         Returns a trigger to react to the game being over with an Easter egg.
         """
         return self._react_game_over_easter
+
+    def get_wall(self, r: int, c: int, d: Direction) -> UnitObject:
+        """
+        Returns the Fortified Wall unit that is targeted by an attacking unit
+        on the tile at row `r` and column `c` when the attacker is facing in
+        direction `d`.
+        """
+        return self._walls[d][
+            c if d in {Direction.U, Direction.D} else r - self._visible
+        ]
+
+    def iter_walls(self) -> Generator[UnitObject, None, None]:
+        """Iterates over the Fortified Wall targets."""
+        for d in DIRECTIONS:
+            yield from self._walls[d]

@@ -22,6 +22,7 @@ from AoE2ScenarioParser.objects.trigger_obj import TriggerObject
 from typing import List
 from direction import Direction
 from hotkeys import HOTKEY_BUILDINGS
+from index import Index
 from probtree import ProbTree
 from tetrisdata import TetrisData
 from tetromino import Tetromino
@@ -108,6 +109,24 @@ def _impl_no_attack_stance(tdata: TetrisData):
             source_player=p,
             attack_stance=AttackStance.NO_ATTACK_STANCE,
         )
+
+
+def _impl_range(tdata: TetrisData):
+    """
+    Adds initialization effects to give 100 range to Invisible Objects and to
+    the units used as Tetrominos for all players.
+    """
+    for p in PLAYERS:
+        for t in range(Tetromino.num() + 1):
+            u = Tetromino.from_int(t).unit if t else Unit.INVISIBLE_OBJECT
+            tdata.init_scenario.add_effect(
+                Effect.MODIFY_ATTRIBUTE,
+                quantity=100,
+                object_list_unit_id=u,
+                source_player=p,
+                operation=Operation.SET,
+                object_attributes=ObjectAttribute.MAX_RANGE,
+            )
 
 
 def _impl_rand_tree(seq_index: int, tree: ProbTree, xs: ScriptCaller):
@@ -262,6 +281,46 @@ def _impl_render_hold_triggers(tdata: TetrisData, xs: ScriptCaller):
         )
 
 
+def _impl_explosion_triggers(tdata: TetrisData, xs: ScriptCaller):
+    """Implements the triggers for exploding rows and clearing the corpses."""
+    for r in range(NUM_VISIBLE, TETRIS_ROWS):
+        explode = tdata.explode_rows[r]
+        clear = tdata.clear_explodes[r]
+        explode.add_condition(
+            Condition.SCRIPT_CALL, xs_function=xs.can_explode(r)
+        )
+        clear.add_condition(
+            Condition.SCRIPT_CALL, xs_function=xs.can_clear_explode(r)
+        )
+        clear.add_effect(
+            Effect.HEAL_OBJECT,
+            quantity=4000,
+            object_list_unit_id=Building.FORTIFIED_WALL,
+            source_player=Player.GAIA,
+        )
+        for c in range(TETRIS_COLS):
+            for d in DIRECTIONS:
+                tile = tdata.board[Index(r, c)]
+                assert tile
+                attacker = tile[d]
+                target = tdata.get_wall(r, c, d)
+                explode.add_effect(
+                    Effect.TASK_OBJECT,
+                    selected_object_ids=[attacker.reference_id],
+                    location_object_reference=target.reference_id,
+                )
+                clear.add_effect(
+                    Effect.STOP_OBJECT,
+                    selected_object_ids=[attacker.reference_id],
+                )
+                clear.add_effect(
+                    Effect.REPLACE_OBJECT,
+                    target_player=Player.GAIA,
+                    object_list_unit_id_2=Unit.INVISIBLE_OBJECT,
+                    selected_object_ids=[attacker.reference_id],
+                )
+
+
 def _add_render_trigger_toggles(
     tdata: TetrisData, activator: TriggerObject, deactivator: TriggerObject
 ):
@@ -285,6 +344,10 @@ def _add_render_trigger_toggles(
         for t in next_list:
             triggers.append(t)
     for t in tdata.render_hold_triggers:
+        triggers.append(t)
+    for t in tdata.explode_rows.values():
+        triggers.append(t)
+    for t in tdata.clear_explodes.values():
         triggers.append(t)
     for t in triggers:
         activator.add_effect(Effect.ACTIVATE_TRIGGER, trigger_id=t.trigger_id)
@@ -370,6 +433,7 @@ def _impl_begin_game(variables: Variables, tdata: TetrisData, xs: ScriptCaller):
     _impl_render_triggers(tdata, xs)
     _impl_render_next_triggers(tdata, xs)
     _impl_render_hold_triggers(tdata, xs)
+    _impl_explosion_triggers(tdata, xs)
 
     tdata.begin_game.add_effect(
         Effect.ACTIVATE_TRIGGER, trigger_id=tdata.begin_game_mid.trigger_id
@@ -538,6 +602,7 @@ def impl_triggers(variables: Variables, tdata: TetrisData):
     )
     _impl_init_invisible_object_ownership(tdata)
     _impl_no_attack_stance(tdata)
+    _impl_range(tdata)
     _impl_objectives(variables, tdata)
     _impl_hotkey_initialization(tdata)
     _impl_begin_game(variables, tdata, xs)
